@@ -1,0 +1,71 @@
+# phases/active/data_manager.py
+import pandas as pd
+import sqlite3
+from typing import Tuple
+
+DATABASE_PATH = "data/working/database/portfolio.db"
+
+def load_positions_from_db() -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Connects to the SQLite database and loads the user's positions.
+
+    Returns:
+        A tuple containing two DataFrames:
+        - direct_positions: Stocks and other direct holdings.
+        - etf_positions: ETF holdings.
+    """
+    print(f"--- DataManager: Loading positions from {DATABASE_PATH} ---")
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        # Updated query to match the actual schema of the populated database
+        # Schema: ISIN, name, total_quantity, average_purchase_price, asset_type
+        # We map:
+        # - ISIN -> isin
+        # - total_quantity -> quantity
+        # - average_purchase_price -> current_price (as a temporary proxy for testing)
+        query = """
+            SELECT 
+                ISIN as isin, 
+                name, 
+                total_quantity as quantity, 
+                CASE 
+                    WHEN average_purchase_price > 0 THEN average_purchase_price 
+                    ELSE 100.0 
+                END as current_price, 
+                asset_type 
+            FROM positions
+        """
+        all_positions = pd.read_sql_query(query, conn)
+        conn.close()
+
+        print(f"  - Loaded {len(all_positions)} total positions from the database.")
+
+        # Calculate market_value
+        all_positions['market_value'] = all_positions['quantity'] * all_positions['current_price']
+
+        # Split positions into direct and ETF based on the 'asset_type' column
+        direct_positions = all_positions[all_positions['asset_type'] != 'ETF'].copy()
+        etf_positions = all_positions[all_positions['asset_type'] == 'ETF'].copy()
+
+        print(f"  - Identified {len(direct_positions)} direct positions.")
+        print(f"  - Identified {len(etf_positions)} ETF positions.")
+
+        return direct_positions, etf_positions
+
+    except sqlite3.Error as e:
+        print(f"❌ FAILED: Database error while loading positions: {e}")
+        # Return empty DataFrames on failure
+        return pd.DataFrame(), pd.DataFrame()
+    except Exception as e:
+        print(f"❌ FAILED: An unexpected error occurred in DataManager: {e}")
+        return pd.DataFrame(), pd.DataFrame()
+
+if __name__ == '__main__':
+    # Standalone test for the data manager
+    direct, etfs = load_positions_from_db()
+    
+    print("\n--- Direct Positions ---")
+    print(direct.head())
+    
+    print("\n--- ETF Positions ---")
+    print(etfs.head())

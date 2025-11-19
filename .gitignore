@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing & Quality
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# Project Data (User Privacy & System State)
+# Ignore contents but keep directory structure
+data/inputs/portfolio/*
+!data/inputs/portfolio/.gitkeep
+
+data/inputs/manual_holdings/*
+!data/inputs/manual_holdings/.gitkeep
+
+data/working/database/*
+!data/working/database/.gitkeep
+
+data/working/cache/*
+!data/working/cache/.gitkeep
+
+data/working/raw_downloads/*
+!data/working/raw_downloads/.gitkeep
+
+data/working/temp/*
+!data/working/temp/.gitkeep
+
+# Project Outputs
+outputs/*
+!outputs/.gitkeep
+
+# AI / Agent Logs
+.llm/logs/
+.claude/
+
+# Legacy / Transient
+tr_pdf_exports/
+*.log
+
+# Documentation (Keep structure, ignore current files)
+docs/archive/*
+!docs/archive/.gitkeep
+
+docs/reference/research/*
+!docs/reference/research/.gitkeep
