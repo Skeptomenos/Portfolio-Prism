@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Enrichment Failure**: Identified and diagnosing a critical issue where European assets were failing enrichment (404s).
+  - **Root Cause**: Adapters were discarding ISINs and relying on raw tickers (e.g., `NESN`), which `yfinance` rejects without a suffix.
+  - **Solution**: Adapters are being updated to preserve ISINs, which `yfinance` handles correctly.
+- **Data Quality**: Identified "garbage" identifiers (e.g., `_CURRENCYUSD`, `UNKNOWN_ISIN`) in the enrichment queue.
+  - **Solution**: Adding pre-enrichment filtering in `aggregation.py` to remove non-equity holdings.
+
+---
+
+## [Phase 7] - 2025-11-20
+
+### Added
+- **Performance Optimization**: Implemented `multiprocessing` in the PDF parser (`src/pdf_parser/parser.py`), parallelizing page processing. Parsing time for a 200-page document reduced from ~10 minutes to under 2 minutes.
+- **Incremental Loading**: Added a `processed_files` table and SHA256 hash checks. The pipeline now instantly skips previously parsed files.
+- **Deduplication**: Implemented a `trades` table in SQLite with a `UNIQUE` constraint on transaction details. The system now uses `INSERT OR IGNORE` to seamlessly handle overlapping export files from Trade Republic.
+- **Robustness**: Fixed a critical parsing bug for German number formats (e.g., `5.229,00`) that was causing crashes on large transactions.
+
+### Changed
+- **Architecture**: `portfolio.db` (SQLite) is now the single source of truth for transaction data. The legacy `trades.csv` is still generated for backward compatibility but is no longer used by the core pipeline.
+- **Setup**: `scripts/setup_db.py` now orchestrates the database initialization and incremental parsing flow.
+
 ---
 
 ## [Phase 5] - 2025-11-18
