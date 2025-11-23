@@ -6,6 +6,7 @@ import pandas as pd
 from functools import wraps
 from datetime import datetime, timedelta
 from src.utils.logging_config import get_logger
+from src.utils.metrics import tracker
 
 logger = get_logger(__name__)
 
@@ -64,10 +65,12 @@ def cache_adapter_data(ttl_hours: int = 24):
                 modified_time = datetime.fromtimestamp(os.path.getmtime(cache_file))
                 if datetime.now() - modified_time < timedelta(hours=ttl_hours):
                     logger.info(f"Loading fresh data for {isin} from cache: {cache_file}")
+                    tracker.increment_system_metric("cache_hits")
                     return pd.read_csv(cache_file)
 
             # If no fresh cache, run the original function
             logger.info(f"No fresh cache for {isin}. Fetching live data using {class_name}.")
+            tracker.increment_system_metric("api_calls_providers")
             result_df = func(self, isin, *args, **kwargs)
             
             # Save the new result to cache, but only if it's valid (not empty)

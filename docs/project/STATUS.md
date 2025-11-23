@@ -1,18 +1,18 @@
 # Project Status
 
-**Current Phase:** Phase 4 (Roadmap Automation) - **COMPLETE**
+**Current Phase:** Phase 6: Reliability & Gap Closure
 **Date:** 2025-11-23
 
 ## ✅ Recent Accomplishments
-- **Automated Roadmap Generation:** Implemented a "Feature Gap Detector" that automatically captures unimplemented providers (e.g., Vanguard) and adds them to `docs/BACKLOG.md`.
-- **Quality Reporting:** The pipeline now generates a `data_quality_report.txt` that explicitly lists which ETFs were skipped and why (e.g., "Provider not implemented").
-- **Resilience:** The pipeline no longer crashes on missing adapters; it gracefully skips them and informs the user.
-- **Interactive Configuration:** Validated the "Human-in-the-Loop" registry update flow.
+- **Visualization:** Launched the "Portfolio X-Ray" dashboard (Streamlit), providing interactive charts for Top Holdings and Asset Allocation.
+- **Pipeline Intelligence:** Instrumented the pipeline with a `MetricsTracker`. It now saves execution stats (time, API calls, cache hits) to `outputs/pipeline_metrics.json`.
+- **Roadmap Automation:** The pipeline automatically detects unimplemented providers (e.g., Vanguard) and adds them to `docs/BACKLOG.md`.
+- **Quality Reporting:** Generated `data_quality_report.txt` to explicitly list skipped assets and reasons.
 
 ## 🚧 Current Focus
-- **Phase 5:** Visualization & Dashboarding (Next).
-- **Maintenance:** Adding missing product IDs for iShares ETFs to improve data coverage.
+- **iShares Coverage:** Fixing the missing `product_id` issue for `DE000A0F5UF5` and automating ID discovery to close the 2.6% value gap.
+- **Interactive Ticker Resolution:** Implementing the "Ticker Map" feature to handle assets where `yfinance` fails (Phase 1 of Roadmap).
 
 ## 📉 Known Issues / Risks
-- **iShares Coverage:** Some iShares ETFs (e.g., `DE000A0F5UF5`) are missing internal `product_id` mappings, causing them to be skipped.
-- **Data Gaps:** ~2.6% value conservation loss due to the above missing data.
+- **Data Gaps:** ~2.6% value conservation loss due to missing iShares data.
+- **Manual Config:** The iShares adapter still relies on a static JSON config that requires manual updates for new ETFs.

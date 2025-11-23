@@ -3,19 +3,19 @@
 **Last Agent:** Gemini
 
 ## 🏁 What was accomplished?
-- **End-to-End Validation:** Successfully ran the full pipeline with live user data, including a deep clean and state reset.
-- **Performance Optimization:** Added a progress bar (`tqdm`) to the PDF parser, drastically improving UX for large files (200+ pages processed in <8 mins).
-- **Self-Healing Config:** Validated the "Human-in-the-Loop" registry update. The system correctly detected 20 new assets, prompted for classification, and persisted the choices.
-- **Critical Bug Fixes:**
-    - Fixed `scripts/update_registry.py` indentation and syntax errors.
-    - Fixed a logic gap where positions loaded from the DB were stale (classified as "Stock") before the registry update. Added a DB sync step (`UPDATE positions SET asset_type='ETF'`) and a hot-reload of dataframes in `run_pipeline.py`.
-    - Updated `ISharesAdapter` to handle ticker suffixes more robustly.
+- **Phase 5 Complete:** Visualization & Intelligence.
+- **Dashboard:** Created `src/dashboard/app.py` (Streamlit). It displays Portfolio Financials (Top 10, Allocation) and Pipeline Health (Funnel, Metrics).
+- **Instrumentation:** Pipeline now tracks metrics (`outputs/pipeline_metrics.json`) and data quality issues (`outputs/data_quality_report.txt`).
+- **Gap Analysis:** Dashboard clearly highlights the "Vanguard" gap and the iShares missing data.
 
 ## 🚧 Where are we? (Current State)
-- The pipeline runs successfully and produces `true_exposure_report.csv`.
-- **Validation Warning:** The pipeline reports a "Value Conservation Failure" (~2.6% loss). This is confirmed to be due to missing internal configuration for specific iShares ETFs (`DE000A0F5UF5`) which prevents the `ISharesAdapter` from fetching data. This is a known data coverage constraint, not a pipeline bug.
+- **Pipeline Health:** Robust, instrumented, and visualized.
+- **Data Gaps:**
+    - **iShares:** Missing `product_id` for `DE000A0F5UF5` (2.6% value loss).
+    - **Market Data:** Some ISINs still fail `yfinance` lookup (need ticker mapping).
+    - **Adapters:** Vanguard is missing (in Backlog).
 
 ## ⏭️ Next Steps (Immediate Action Required)
-1.  **Expand iShares Support:** Add the missing product IDs (e.g., for `DE000A0F5UF5`) to `src/adapters/ishares.py`.
-2.  **Add New Adapters:** Create adapters for providers not yet supported (e.g., Vanguard) if the user maps assets to them.
-3.  **UI/Visualization:** Consider building a simple dashboard to visualize the generated CSV reports.
+1.  **Phase 6 (Reliability):** Fix the iShares `product_id` discovery.
+2.  **Ticker Resolution:** Implement the interactive ticker map in `market.py`.
+3.  **Run Dashboard:** Use `./run_dashboard.sh` to see the improvements in real-time.

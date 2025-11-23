@@ -23,6 +23,7 @@ from src.utils.schemas import HoldingsSchema
 import pandera as pa
 from datetime import datetime
 from scripts.update_registry import update_registry_interactive
+from src.utils.metrics import tracker
 
 logger = get_logger(__name__)
 
@@ -46,12 +47,19 @@ def run_pipeline():
     """
     Orchestrates the entire True Exposure pipeline from start to finish.
     """
+    tracker.start_run()
     logger.info("--- Starting True Exposure Pipeline ---")
 
     # --- Phase 1 & 2 (Data Loading) ---
     direct_positions, etf_positions = load_positions_from_db()
+    
+    tracker.set_funnel_metric("total_positions_db", len(direct_positions) + len(etf_positions))
+    tracker.set_funnel_metric("direct_holdings", len(direct_positions))
+    tracker.set_funnel_metric("etf_positions", len(etf_positions))
+
     if direct_positions.empty and etf_positions.empty:
         logger.warning("--- Pipeline Halted: No positions found in the database. ---")
+        tracker.save("outputs/pipeline_metrics.json")
         return
 
     # --- Phase 2.1: Registry Update (Human-in-the-Loop) ---
@@ -100,6 +108,11 @@ def run_pipeline():
     # now-updated adapter_registry.json.
     logger.info("--- Reloading positions with updated registry... ---")
     direct_positions, etf_positions = load_positions_from_db()
+    
+    # Update funnel metrics again after reload/re-sync
+    tracker.set_funnel_metric("total_positions_db", len(direct_positions) + len(etf_positions))
+    tracker.set_funnel_metric("direct_holdings", len(direct_positions))
+    tracker.set_funnel_metric("etf_positions", len(etf_positions))
 
     # --- Setup Adapter Registry (after potential updates) ---
     adapter_registry = AdapterRegistry()
@@ -157,33 +170,42 @@ def run_pipeline():
             adapter = adapter_registry.get_adapter(isin)
             if not adapter:
                 failed_etfs.append((isin, "No adapter registered for this ISIN."))
+                tracker.increment_system_metric("etfs_failed")
                 continue
+            
+            tracker.increment_system_metric("etfs_with_adapter")
 
             # 2. Fetch Data
             holdings = adapter.fetch_holdings(isin)
             if holdings.empty:
                 failed_etfs.append((isin, "Adapter returned no data."))
+                tracker.increment_system_metric("etfs_failed")
                 continue
 
             # 3. Validate Data
             holdings = HoldingsSchema.validate(holdings)
             
             etf_holdings_map[isin] = holdings
+            tracker.increment_system_metric("etfs_successfully_fetched")
             logger.info(f"--- Successfully fetched and validated {len(holdings)} holdings for {etf['name']}. ---")
 
         except AdapterNotImplementedError as e:
             logger.warning(f"Skipping {etf['name']}: {e}")
             failed_etfs.append((isin, f"Not Implemented: {e} (Added to Roadmap)"))
+            tracker.increment_system_metric("etfs_failed")
         except pa.errors.SchemaError as e:
             logger.error(f"Data contract validation failed for {etf['name']}: {e}")
             failed_etfs.append((isin, f"Validation Error: {e.args[0]}"))
+            tracker.increment_system_metric("etfs_failed")
         except Exception as e:
             logger.error(f"An unexpected error occurred for {etf['name']}: {e}")
             failed_etfs.append((isin, f"Unexpected Error: {e}"))
+            tracker.increment_system_metric("etfs_failed")
     
     aggregated_df = run_aggregation(direct_positions, etf_positions, etf_holdings_map)
     if aggregated_df.empty and not failed_etfs:
         logger.warning("--- Pipeline Halted: Aggregation produced no results, and no ETF failures were recorded. ---")
+        tracker.save("outputs/pipeline_metrics.json")
         return
 
     # --- Phase 4 (Reporting) ---
@@ -197,6 +219,8 @@ def run_pipeline():
 
     # --- Final Step: Data Quality Report ---
     generate_quality_report(failed_etfs, "outputs/data_quality_report.txt")
+    
+    tracker.save("outputs/pipeline_metrics.json")
 
     logger.info("--- True Exposure Pipeline Finished ---")
 

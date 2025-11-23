@@ -1,17 +1,16 @@
 # 🔴 Active Session State
-**Objective:** Phase 4: Roadmap Automation & Feedback Loop
-**Status:** Complete
+**Objective:** Phase 6: Reliability & Gap Closure
+**Status:** Pending
 
 ## 🛡️ Applied Constraints
-- [Constraint: User Feedback] - Users must be informed when a feature (adapter) is missing, not just see a generic error.
-- [Constraint: Automation] - The backlog should be populated automatically by system events.
+- [Constraint: Automation] - The solution for iShares ID discovery must not rely on manual JSON editing by the user.
+- [Constraint: Data Integrity] - Ticker mapping must be validated by a successful price fetch before being saved.
 
 ## 📝 Plan & Progress
-- [x] 1. **Initialize Backlog:** Created `docs/BACKLOG.md`.
-- [x] 2. **Enhance Registry:** Updated `src/adapters/registry.py` to raise `AdapterNotImplementedError` and log to backlog.
-- [x] 3. **Update Pipeline:** Modified `scripts/run_pipeline.py` to catch the new error and generate `outputs/data_quality_report.txt`.
-- [x] 4. **Verify:** Validated with a dummy "vanguard" mapping; confirmed backlog update and clean pipeline exit.
+- [ ] 1. **iShares Fix:** Implement automated scraping or a better search strategy to find the `product_id` for `DE000A0F5UF5` (and others) without user intervention if possible.
+- [ ] 2. **Ticker Map:** Implement the interactive prompt in `market.py` to ask the user for a valid Yahoo ticker when `yfinance` returns 404.
+- [ ] 3. **Verify:** Run the full pipeline and ensure the "Value Conservation" loss drops from 2.6% to near 0%.
 
 ## 🧠 Context & Learnings
-*   **Feature Gap Detection:** It is possible to distinguish between "configuration errors" and "missing features" by checking if a provider key exists in the config but not in the code.
-*   **Self-Documentation:** The system can effectively "write its own roadmap" by logging unimplemented features encountered during runtime.
+*   **Dashboard Insights:** The new dashboard clearly shows the "Data Funnel" drops. This visibility makes it easier to track the impact of our fixes.
+*   **iShares Complexity:** The `product_id` is a hidden internal identifier. We might need to parse the search results page from the iShares website to find it dynamically.

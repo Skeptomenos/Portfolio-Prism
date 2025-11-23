@@ -3,11 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **Dashboard**: Launched a Streamlit-based "Portfolio X-Ray" dashboard (`src/dashboard/app.py`). It visualizes:
+  - **Financials**: Top 10 Holdings, Asset Allocation (Sunburst/Pie), and a search tool for underlying assets.
+  - **Operations**: A "Data Funnel" showing asset flow from DB to Report, plus execution metrics (time, cache hits).
+- **Pipeline Instrumentation**: Added `MetricsTracker` (`src/utils/metrics.py`) to the main pipeline. It captures structured performance data (API calls, cache hits, failure counts) and saves it to `outputs/pipeline_metrics.json`.
 - **Roadmap Automation**: Implemented a "Feature Gap Detector" that automatically captures unimplemented providers (e.g., Vanguard) and logs them to `docs/BACKLOG.md`.
 - **Quality Reporting**: The pipeline now generates `outputs/data_quality_report.txt`, explicitly listing skipped ETFs and the reason for exclusion (e.g., "Provider not implemented").
 - **Registry Automation**: Implemented an interactive "Setup Wizard" (`scripts/update_registry.py`) integrated into the main pipeline. It detects new/unknown ISINs and prompts the user to map them to an adapter (iShares, Amundi, etc.) or ignore them.
-  - Includes safety validation to warn if the selected provider doesn't match the ETF name.
-  - Persists "ignore" choices to prevent repetitive prompting.
 
 ### Fixed
 - **Enrichment Failure (Europe)**: Fixed widespread 404 errors in `yfinance` enrichment for European assets.
