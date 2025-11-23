@@ -1,18 +1,19 @@
 # Project Status
 
-**Current Phase:** Phase 6: Reliability & Gap Closure
+**Current Phase:** Phase 7: Optimization & Polish
 **Date:** 2025-11-23
 
 ## ✅ Recent Accomplishments
-- **Visualization:** Launched the "Portfolio X-Ray" dashboard (Streamlit), providing interactive charts for Top Holdings and Asset Allocation.
-- **Pipeline Intelligence:** Instrumented the pipeline with a `MetricsTracker`. It now saves execution stats (time, API calls, cache hits) to `outputs/pipeline_metrics.json`.
-- **Roadmap Automation:** The pipeline automatically detects unimplemented providers (e.g., Vanguard) and adds them to `docs/BACKLOG.md`.
-- **Quality Reporting:** Generated `data_quality_report.txt` to explicitly list skipped assets and reasons.
+- **Reliability:** Implemented automated iShares `product_id` discovery, closing the 2.6% data gap.
+- **Noise Reduction:** Filtered out `_CURRENCY` and `NON_EQUITY` from enrichment to prevent API spam.
+- **Data Quality:** Removed invalid test cases (ThyssenKrupp -> Vanguard) from the registry.
+- **Interactive Mapping:** Validated the "Ticker Map" feature for direct holdings.
 
 ## 🚧 Current Focus
-- **iShares Coverage:** Fixing the missing `product_id` issue for `DE000A0F5UF5` and automating ID discovery to close the 2.6% value gap.
-- **Interactive Ticker Resolution:** Implementing the "Ticker Map" feature to handle assets where `yfinance` fails (Phase 1 of Roadmap).
+- **Backlog Execution:** Implementing missing adapters (e.g., Vanguard) identified by the roadmap automation.
+- **Performance:** Optimizing the dashboard load time and pipeline execution speed.
+- **UX Polish:** Refining the dashboard visualization and interactivity.
 
 ## 📉 Known Issues / Risks
-- **Data Gaps:** ~2.6% value conservation loss due to missing iShares data.
-- **Manual Config:** The iShares adapter still relies on a static JSON config that requires manual updates for new ETFs.
+- **Adapter Coverage:** Vanguard and other providers are still missing (tracked in Backlog).
+- **Interactive Dependencies:** Some features (Ticker Map, Registry Update) require an interactive terminal, which can be a limitation for automated background runs.

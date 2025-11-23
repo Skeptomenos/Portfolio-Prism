@@ -3,19 +3,16 @@
 **Last Agent:** Gemini
 
 ## 🏁 What was accomplished?
-- **Phase 5 Complete:** Visualization & Intelligence.
-- **Dashboard:** Created `src/dashboard/app.py` (Streamlit). It displays Portfolio Financials (Top 10, Allocation) and Pipeline Health (Funnel, Metrics).
-- **Instrumentation:** Pipeline now tracks metrics (`outputs/pipeline_metrics.json`) and data quality issues (`outputs/data_quality_report.txt`).
-- **Gap Analysis:** Dashboard clearly highlights the "Vanguard" gap and the iShares missing data.
+- **Phase 6 Complete:** Reliability & Gap Closure.
+- **iShares Solved:** Auto-discovery of `product_id` implemented. No more manual config editing.
+- **Noise Silenced:** `enrichment.py` now filters out 404-prone internal identifiers.
+- **Clean Config:** Removed invalid test cases.
 
 ## 🚧 Where are we? (Current State)
-- **Pipeline Health:** Robust, instrumented, and visualized.
-- **Data Gaps:**
-    - **iShares:** Missing `product_id` for `DE000A0F5UF5` (2.6% value loss).
-    - **Market Data:** Some ISINs still fail `yfinance` lookup (need ticker mapping).
-    - **Adapters:** Vanguard is missing (in Backlog).
+- **Pipeline:** Highly reliable, instrumented, and quiet.
+- **Data Gaps:** Minimally existent.
+- **Next Phase:** Phase 7 (Optimization & Polish) + Backlog Execution.
 
 ## ⏭️ Next Steps (Immediate Action Required)
-1.  **Phase 6 (Reliability):** Fix the iShares `product_id` discovery.
-2.  **Ticker Resolution:** Implement the interactive ticker map in `market.py`.
-3.  **Run Dashboard:** Use `./run_dashboard.sh` to see the improvements in real-time.
+1.  **Phase 7:** Pick an item from `docs/BACKLOG.md` (likely Vanguard adapter).
+2.  **Dashboard:** Continue refining the Streamlit app based on user feedback.

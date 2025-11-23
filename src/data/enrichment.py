@@ -65,6 +65,10 @@ def enrich_securities_bulk(securities_to_fetch, force_refresh=False):
         identifier = security.get('ticker') or security.get('isin')
         if not identifier:
             continue
+            
+        # Filter out internal placeholders to prevent API noise
+        if identifier.startswith('_') or 'NON_EQUITY' in identifier or 'CASH' in identifier:
+            continue
 
         cache_key = get_cache_key(identifier)
         

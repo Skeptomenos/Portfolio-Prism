@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import re
 import pandas as pd
 import requests
 from io import StringIO
@@ -41,6 +42,35 @@ class ISharesAdapter:
         except Exception as e:
             logger.error(f"Failed to save iShares config: {e}")
 
+    def _discover_product_id(self, isin: str) -> str:
+        """
+        Automated discovery of the iShares Product ID using the site's search feature.
+        """
+        logger.info(f"Attempting to auto-discover Product ID for {isin}...")
+        search_url = f"https://www.ishares.com/de/privatanleger/de/suche/search-results?searchTerm={isin}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+
+        try:
+            response = requests.get(search_url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            # Simple Regex to find the product page link
+            # Pattern looks for: /produkte/251795/
+            match = re.search(r'/produkte/(\d+)/', response.text)
+            
+            if match:
+                product_id = match.group(1)
+                logger.info(f"✅ Auto-discovered Product ID: {product_id}")
+                return product_id
+            else:
+                logger.warning(f"Could not find Product ID in search results for {isin}.")
+                return None
+        except Exception as e:
+            logger.error(f"Auto-discovery failed: {e}")
+            return None
+
     def _prompt_for_product_id(self, isin: str) -> str:
         """
         Interactively prompts the user for the missing Product ID.
@@ -74,28 +104,31 @@ class ISharesAdapter:
         # 1. Check Config
         etf_info = self.config.get(isin)
 
-        # 2. Interactive Fallback
+        # 2. Discovery & Fallback
         if not etf_info:
-            if sys.stdout.isatty():
+            # A) Try Auto-Discovery
+            product_id = self._discover_product_id(isin)
+            
+            # B) Try Manual Prompt (if auto fails and interactive)
+            if not product_id and sys.stdout.isatty():
                 product_id = self._prompt_for_product_id(isin)
-                if product_id:
-                    # Default to private investor / de region for now
-                    self.config[isin] = {
-                        "product_id": product_id,
-                        "region": "de",
-                        "user_type": "privatanleger"
-                    }
-                    self._save_config()
-                    etf_info = self.config[isin]
-                else:
-                    logger.warning(f"Skipped configuration for {isin}. Cannot fetch data.")
-                    return pd.DataFrame()
+
+            if product_id:
+                # Default to private investor / de region for now
+                self.config[isin] = {
+                    "product_id": product_id,
+                    "region": "de",
+                    "user_type": "privatanleger"
+                }
+                self._save_config()
+                etf_info = self.config[isin]
             else:
-                logger.error(f"ISIN {isin} is not configured for ISharesAdapter and no interactive shell available.")
+                logger.warning(f"Skipped configuration for {isin}. Cannot fetch data.")
                 return pd.DataFrame()
 
         product_id = etf_info.get('product_id')
         region = etf_info.get('region', 'de')
+
         user_type = etf_info.get('user_type', 'privatanleger')
         
         # Ticker might be missing in config if freshly added, but we don't strictly need it for the URL
