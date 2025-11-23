@@ -8,16 +8,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Before starting ANY task, read in this exact order:
 
-1. **`.llm/project_learnings.md`** ← CRITICAL permanent learnings (read FIRST)
-2. **`docs/AI_UNIVERSAL_PATTERNS.md`** ← Universal methodology (OODA loop, Phase 0-4, all platforms)
-3. **`CLAUDE.md`** ← This file (Claude Code specifics, commands, project status)
+1. **`.context/active_state.md`** ← CRITICAL state file (read FIRST)
+2. **`.context/handover.md`** ← Continuity file (read if active state is empty)
+3. **`docs/PROJECT_LEARNINGS.md`** ← Permanent constraints
+4. **`docs/agent/AI_CODING_DIRECTIVES.md`** ← The v2 Methodology (Phase 0-4)
+5. **`docs/agent/CODING_STANDARDS.md`** ← Style, Security, & Testing Rules
+6. **`CLAUDE.md`** ← Tool reference
 
 **Why this order matters:**
-- `.llm/project_learnings.md` contains domain-specific patterns discovered through iteration ("Free API Fallacy", "Inspector Spike Pattern", etc.)
-- `AI_UNIVERSAL_PATTERNS.md` provides methodology that works across all LLM platforms
-- This file provides Claude Code-specific tools and project-specific quick reference
+- State files (`.context/*`) ensure you pick up exactly where the previous agent left off.
+- `AI_CODING_DIRECTIVES.md` defines the mandatory workflow.
+- `CODING_STANDARDS.md` ensures your code passes quality gates (Linting, Typing, Security).
+- `PROJECT_LEARNINGS.md` contains the domain constraints you must obey.
 
-**Skipping these files will violate established project patterns and cause rework.**
+**Skipping these files will result in a loss of context and violation of project mandates.**
 
 ---
 

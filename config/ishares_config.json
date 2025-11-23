@@ -1,0 +1,37 @@
+{
+    "IE00B4L5Y983": {
+        "product_id": "251882",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "IWDA"
+    },
+    "IE00B5BMR087": {
+        "product_id": "251900",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "SXR8"
+    },
+    "IE0031442068": {
+        "product_id": "251900",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "IUSA_DIST"
+    },
+    "IE00B3WJKG14": {
+        "product_id": "280510",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "IUIT"
+    },
+    "IE00B53SZB19": {
+        "product_id": "251903",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "CSNDX"
+    },
+    "DE000A0F5UF5": {
+        "product_id": "251795",
+        "region": "de",
+        "user_type": "privatanleger"
+    }
+}

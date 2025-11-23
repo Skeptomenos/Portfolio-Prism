@@ -10,21 +10,25 @@ if project_root not in sys.path:
 
 from src.pdf_parser.parser import main as run_pdf_parser
 from src.core.position_keeper import calculate_positions
+from src.data.database import get_all_trades, init_db
+from src.pdf_parser.utils import parse_description
 import json
 
 DATABASE_PATH = "data/working/database/portfolio.db"
 PDF_INPUT_DIR = "data/inputs/portfolio"
-TRADES_OUTPUT_PATH = "outputs/trades.csv"
 CONFIG_PATH = "config/adapter_registry.json"
 
 def run_live_population():
     """
-    Parses live PDF data, calculates positions, and saves them to the database.
+    Parses live PDF data (incrementally), calculates positions, and saves them to the database.
     """
     print("--- Starting live data population process ---")
     
-    # Step 1: Parse all PDFs to generate trades.csv
-    print(f"1. Parsing all PDFs from '{PDF_INPUT_DIR}'...")
+    # Initialize DB Schema
+    init_db()
+    
+    # Step 1: Incremental Parse (Update 'trades' table in DB)
+    print(f"1. Updating Database from PDFs in '{PDF_INPUT_DIR}'...")
     # The parser script needs to be run from the root, so we change dir temporarily
     original_cwd = os.getcwd()
     os.chdir(project_root)
@@ -34,12 +38,39 @@ def run_live_population():
     run_pdf_parser()
     
     os.chdir(original_cwd)
-    print(f"   - Trades saved to '{TRADES_OUTPUT_PATH}'.")
     
-    # Step 2: Calculate positions from trades.csv
-    print("2. Calculating positions from trades...")
-    trades_df = pd.read_csv(TRADES_OUTPUT_PATH)
-    positions_df = calculate_positions(trades_df)
+    # Step 2: Fetch and Parse Trades from DB
+    print("2. Calculating positions from Database...")
+    raw_trades = get_all_trades()
+    if raw_trades.empty:
+        print("   - No trades found in database. Exiting.")
+        return
+
+    # Filter for 'TRADE' type and parse descriptions
+    # Note: Column names in DB are lowercase (date, type, description...)
+    
+    trade_rows = raw_trades[raw_trades['type'] == 'TRADE'].copy()
+    if trade_rows.empty:
+         print("   - No execution trades found (only cash transactions?).")
+         return
+
+    parsed_data = trade_rows['description'].apply(parse_description)
+    
+    # Reconstruct the DataFrame expected by calculate_positions
+    # It expects: ISIN, NAME, QUANTITY, PRICE, TRADE_TYPE, DATE
+    parsed_df = pd.DataFrame(parsed_data.tolist(), index=trade_rows.index)
+    parsed_df['DATE'] = trade_rows['date']
+    
+    # Rename cols to match position_keeper expectation (Upper Case)
+    parsed_df.rename(columns={
+        'isin': 'ISIN',
+        'name': 'NAME',
+        'quantity': 'QUANTITY',
+        'price': 'PRICE',
+        'trade_type': 'TRADE_TYPE'
+    }, inplace=True)
+    
+    positions_df = calculate_positions(parsed_df)
     
     # Step 3: Classify assets as Stock or ETF
     print("3. Classifying assets...")

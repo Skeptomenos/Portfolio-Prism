@@ -28,11 +28,8 @@ def load_positions_from_db() -> Tuple[pd.DataFrame, pd.DataFrame]:
                 ISIN as isin, 
                 name, 
                 total_quantity as quantity, 
-                CASE 
-                    WHEN average_purchase_price > 0 THEN average_purchase_price 
-                    ELSE 100.0 
-                END as current_price, 
-                asset_type 
+                average_purchase_price,
+                asset_type
             FROM positions
         """
         all_positions = pd.read_sql_query(query, conn)
@@ -40,8 +37,12 @@ def load_positions_from_db() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
         print(f"  - Loaded {len(all_positions)} total positions from the database.")
 
-        # Calculate market_value
-        all_positions['market_value'] = all_positions['quantity'] * all_positions['current_price']
+        # Initialize current_price with None (to be filled by market data)
+        # We essentially discard the purchase price as a proxy for current value
+        all_positions['current_price'] = None
+        
+        # Initialize market_value to 0.0 (will be calculated later if price is found)
+        all_positions['market_value'] = 0.0
 
         # Split positions into direct and ETF based on the 'asset_type' column
         direct_positions = all_positions[all_positions['asset_type'] != 'ETF'].copy()

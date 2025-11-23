@@ -4,8 +4,17 @@ from pathlib import Path
 import pdfplumber
 import sys
 import os
+import hashlib
+import multiprocessing
+from functools import partial
 from src.pdf_parser.utils import parse_description
 from deep_translator import GoogleTranslator
+from tqdm import tqdm
+from src.data.database import (
+    is_file_processed,
+    mark_file_processed,
+    insert_trades_ignore_duplicates,
+)
 
 # Translation mappings
 HEADER_MAPPING = {
@@ -23,6 +32,15 @@ TYPE_MAPPING = {
     "Kartentransaktion": "CARD_TRANSACTION",
     "Überweisung": "TRANSFER",
 }
+
+
+def calculate_file_hash(file_path: Path) -> str:
+    """Calculate SHA256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 
 def translate_to_english(text: str) -> str:
@@ -66,15 +84,18 @@ def process_words_to_rows(page, headers):
     current_row = None
     for line_words in lines:
         # Check if this line starts a new transaction (has a TYPE entry)
-        has_typ = any(
-            word["text"].strip()
-            for word in line_words
-            if header_boundaries["TYPE"][0] <= word["x0"] < header_boundaries["TYPE"][1]
-        )
-
-        if has_typ and current_row is not None:
-            raw_rows.append(current_row)
-            current_row = None
+        # We assume "TYPE" exists in boundaries because we filter headers before calling this
+        if "TYPE" in header_boundaries:
+            has_typ = any(
+                word["text"].strip()
+                for word in line_words
+                if header_boundaries["TYPE"][0]
+                <= word["x0"]
+                < header_boundaries["TYPE"][1]
+            )
+            if has_typ and current_row is not None:
+                raw_rows.append(current_row)
+                current_row = None
 
         if current_row is None:
             current_row = {h["text"]: [] for h in headers}
@@ -97,6 +118,163 @@ def process_words_to_rows(page, headers):
     return pd.DataFrame(raw_rows)
 
 
+def parse_transaction_amount(row):
+    """Helper to parse amount strings."""
+    besch = row.get("DESCRIPTION", "")
+    typ = row.get("TYPE", "")
+    amount = 0.0
+
+    # Extract amount from description (e.g., "1,84 €" or "2.000,00 €")
+    import re
+
+    amount_match = re.search(r"([\d.,]+)\s*€", str(besch))
+    if amount_match:
+        amount_str = amount_match.group(1)
+        # Handle German format: remove dots, replace comma with dot
+        amount_str = amount_str.replace(".", "").replace(",", ".")
+        if not amount_str:
+            amount = 0.0
+        else:
+            try:
+                amount = float(amount_str)
+            except ValueError:
+                amount = 0.0
+        # Determine direction
+        if (
+            typ in ["INTEREST_PAYMENT", "DIVIDENDS", "PREMIUM"]
+            or "Incoming" in str(besch)
+        ):
+            pass  # positive
+        elif typ in ["CARD_TRANSACTION", "TRANSFER"] or "Outgoing" in str(besch):
+            amount = -amount
+        elif typ == "TRADE":
+            amount = 0  # Trades are not cash transactions
+    row["AMOUNT"] = amount
+    return row
+
+
+def process_single_page(args):
+    """
+    Worker function to process a single page.
+    Args: (pdf_path, page_idx)
+    Returns: (trades_df, transactions_df) or (None, None)
+    """
+    pdf_path, page_idx = args
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            page = pdf.pages[page_idx]
+
+            # Header detection
+            header_text = page.search("UMSATZÜBERSICHT")
+            footer_text = page.search("Seite")
+
+            if page_idx == 0:
+                if not header_text:
+                    return None, None
+                y0 = header_text[0]["bottom"]
+            else:
+                y0 = 0
+
+            y1 = footer_text[0]["top"] if footer_text else page.height
+            cropped_page = page.crop((0, y0, page.width, y1))
+
+            # Find headers
+            header_words = sorted(
+                [
+                    word
+                    for word in cropped_page.extract_words()
+                    if word["text"] in ["DATUM", "TYP", "BESCHREIBUNG", "SALDO"]
+                ],
+                key=lambda w: w["x0"],
+            )
+
+            # Translate headers
+            header_words = [
+                {**w, "text": HEADER_MAPPING.get(w["text"], w["text"])}
+                for w in header_words
+            ]
+
+            # Validate headers
+            found_header_texts = [h["text"] for h in header_words]
+            if "TYPE" not in found_header_texts:
+                return None, None
+            if not header_words:
+                return None, None
+
+            page_df = process_words_to_rows(cropped_page, header_words)
+
+            if page_df.empty:
+                return None, None
+
+            # Translate content
+            if "TYPE" in page_df.columns:
+                page_df["TYPE"] = page_df["TYPE"].map(lambda x: TYPE_MAPPING.get(x, x))
+            if "DESCRIPTION" in page_df.columns:
+                page_df["DESCRIPTION"] = page_df["DESCRIPTION"].apply(
+                    translate_to_english
+                )
+
+            # Process Transactions
+            transactions_df = page_df.copy()
+            transactions_df = transactions_df.apply(parse_transaction_amount, axis=1)
+
+            valid_types = [
+                "INTEREST_PAYMENT",
+                "TRADE",
+                "DIVIDENDS",
+                "PREMIUM",
+                "CARD_TRANSACTION",
+                "TRANSFER",
+            ]
+            
+            # Filter transactions
+            if "TYPE" in transactions_df.columns:
+                transactions_df = transactions_df[
+                    transactions_df["TYPE"].notna()
+                    & transactions_df["TYPE"].isin(valid_types)
+                ]
+                cols = ["DATE", "TYPE", "DESCRIPTION", "AMOUNT", "BALANCE"]
+                # Only keep cols that exist
+                existing_cols = [c for c in cols if c in transactions_df.columns]
+                transactions_df = transactions_df[existing_cols]
+            else:
+                transactions_df = pd.DataFrame()
+
+
+            # Process Trades
+            trades_df = pd.DataFrame()
+            if "TYPE" in page_df.columns and "TRADE" in page_df["TYPE"].values:
+                raw_trades = page_df[page_df["TYPE"] == "TRADE"].copy()
+                if not raw_trades.empty:
+                    parsed_data = raw_trades["DESCRIPTION"].apply(parse_description)
+                    trades_df = pd.DataFrame(
+                        parsed_data.tolist(), index=raw_trades.index
+                    )
+                    trades_df["DATE"] = raw_trades["DATE"]
+                    trades_df["TYPE"] = "TRADE" # Ensure type exists
+                    trades_df["DESCRIPTION"] = raw_trades["DESCRIPTION"]
+                    trades_df["AMOUNT"] = 0.0 # Placeholder
+                    trades_df["BALANCE"] = 0.0 # Placeholder
+                    
+                    # Rename for standard schema
+                    trades_df.rename(
+                        columns={
+                            "isin": "ISIN",
+                            "name": "NAME",
+                            "quantity": "QUANTITY",
+                            "price": "PRICE",
+                            "trade_type": "TRADE_TYPE",
+                        },
+                        inplace=True,
+                    )
+
+            return trades_df, transactions_df
+
+    except Exception as e:
+        # print(f"Error parsing page {page_idx}: {e}")
+        return None, None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Parse Trade Republic PDF exports.")
     parser.add_argument(
@@ -117,173 +295,74 @@ def main():
     output_path = Path(args.output_folder)
     output_path.mkdir(exist_ok=True)
 
-    all_trades = []
-    all_transactions = []
-    for pdf_file in input_path.glob("*.pdf"):
-        print(f"Processing: {pdf_file}")
+    pdf_files = list(input_path.glob("*.pdf"))
+    total_files = len(pdf_files)
+
+    # Use 80% of CPU cores or at least 1
+    num_workers = max(1, int(os.cpu_count() * 0.8))
+
+    for i, pdf_file in enumerate(pdf_files, 1):
+        print(f"Processing [{i}/{total_files}]: {pdf_file.name}")
+        
+        # 1. Check Hash
+        file_hash = calculate_file_hash(pdf_file)
+        if is_file_processed(file_hash):
+            print(f"  - ✅ File already processed (Hash match). Skipping.")
+            continue
+
+        # 2. Parallel Parse
         with pdfplumber.open(pdf_file) as pdf:
-            for page_idx, page in enumerate(pdf.pages):
-                # Find the "Umsatzübersicht" header and footer to define the table area
-                header_text = page.search("UMSATZÜBERSICHT")
-                footer_text = page.search("Seite")
+            num_pages = len(pdf.pages)
+        
+        print(f"  - New file detected. Parsing {num_pages} pages with {num_workers} workers...")
+        
+        # Prepare args for map
+        page_args = [(pdf_file, idx) for idx in range(num_pages)]
+        
+        all_trades_dfs = []
+        all_transactions_dfs = []
+        
+        with multiprocessing.Pool(num_workers) as pool:
+            # Use imap for progress tracking
+            results_iterator = pool.imap(process_single_page, page_args)
+            
+            # Wrap with tqdm for progress bar
+            for res in tqdm(results_iterator, total=num_pages, desc="Parsing Pages", unit="page"):
+                trades, transactions = res
+                if trades is not None and not trades.empty:
+                    all_trades_dfs.append(trades)
+                if transactions is not None and not transactions.empty:
+                    all_transactions_dfs.append(transactions)
 
-                if page_idx == 0:
-                    # First page: require "UMSATZÜBERSICHT"
-                    if not header_text:
-                        continue
-                    y0 = header_text[0]["bottom"]
-                else:
-                    # Continuation pages: table starts at top
-                    y0 = 0
+        # 3. Consolidate & Store
+        new_trades_count = 0
+        
+        if all_transactions_dfs:
+            # We currently only store 'trades' (parsed executions) in DB for unique checking
+            # But we also extract 'transactions' (cash flow).
+            # For the DB 'trades' table, we actually want the RAW transaction data to match the unique constraint
+            # (Date, Type, Description, Amount, Balance)
+            
+            # Merge all transactions
+            full_transactions = pd.concat(all_transactions_dfs, ignore_index=True)
+            
+            # Insert into DB and get count of NEW items
+            new_trades_count = insert_trades_ignore_duplicates(full_transactions)
+            print(f"  - Inserted {new_trades_count} new transactions into Database.")
+            
+            # Save CSVs for legacy compatibility / debugging
+            full_transactions.to_csv(output_path / "transactions.csv", index=False)
+        
+        if all_trades_dfs:
+             full_trades = pd.concat(all_trades_dfs, ignore_index=True)
+             full_trades.to_csv(output_path / "trades.csv", index=False)
+             print(f"  - Generated {len(full_trades)} parsed trades (saved to CSV).")
 
-                y1 = footer_text[0]["top"] if footer_text else page.height
-
-                cropped_page = page.crop((0, y0, page.width, y1))
-
-                # Find the precise header words to define columns
-                header_words = sorted(
-                    [
-                        word
-                        for word in cropped_page.extract_words()
-                        if word["text"]
-                        in [
-                            "DATUM",
-                            "TYP",
-                            "BESCHREIBUNG",
-                            "SALDO",
-                        ]
-                    ],
-                    key=lambda w: w["x0"],
-                )
-
-                # Translate headers to English
-                header_words = [
-                    {**w, "text": HEADER_MAPPING.get(w["text"], w["text"])}
-                    for w in header_words
-                ]
-
-                if not header_words:
-                    continue
-
-                page_df = process_words_to_rows(cropped_page, header_words)
-
-                # Translate types and descriptions to English
-                page_df["TYPE"] = page_df["TYPE"].map(lambda x: TYPE_MAPPING.get(x, x))
-                page_df["DESCRIPTION"] = page_df["DESCRIPTION"].apply(
-                    translate_to_english
-                )
-
-                # Process all transactions
-                transactions_df = page_df.copy()
-
-                # Parse amounts for transactions
-                def parse_transaction_amount(row):
-                    besch = row["DESCRIPTION"]
-                    typ = row["TYPE"]
-                    amount = 0.0
-
-                    # Extract amount from description (e.g., "1,84 €" or "2.000,00 €")
-                    import re
-
-                    amount_match = re.search(r"([\d.,]+)\s*€", besch)
-                    if amount_match:
-                        amount_str = amount_match.group(1)
-                        # Handle German format: remove dots, replace comma with dot
-                        amount_str = amount_str.replace(".", "").replace(",", ".")
-                        if not amount_str:
-                            amount = 0.0
-                        else:
-                            try:
-                                amount = float(amount_str)
-                            except ValueError:
-                                amount = 0.0
-                        # Determine direction
-                        if (
-                            typ in ["INTEREST_PAYMENT", "DIVIDENDS", "PREMIUM"]
-                            or "Incoming" in besch
-                        ):
-                            pass  # positive
-                        elif (
-                            typ in ["CARD_TRANSACTION", "TRANSFER"]
-                            or "Outgoing" in besch
-                        ):
-                            amount = -amount
-                        elif typ == "TRADE":
-                            amount = 0  # Trades are not cash transactions
-                    row["AMOUNT"] = amount
-                    return row
-
-                transactions_df = transactions_df.apply(
-                    parse_transaction_amount, axis=1
-                )
-                # Filter out headers, footers, and empty rows
-                valid_types = [
-                    "INTEREST_PAYMENT",
-                    "TRADE",
-                    "DIVIDENDS",
-                    "PREMIUM",
-                    "CARD_TRANSACTION",
-                    "TRANSFER",
-                ]
-                transactions_df = transactions_df[
-                    transactions_df["TYPE"].notna()
-                    & transactions_df["TYPE"].isin(valid_types)
-                ]
-                transactions_df = transactions_df[
-                    ["DATE", "TYPE", "DESCRIPTION", "AMOUNT", "BALANCE"]
-                ]
-                all_transactions.append(transactions_df)
-
-                # Process trades separately
-                trades_df = page_df[page_df["TYPE"] == "TRADE"].copy()
-
-                if not trades_df.empty:
-                    parsed_data = trades_df["DESCRIPTION"].apply(parse_description)
-
-                    # Create a new DataFrame from the parsed data
-                    final_trades = pd.DataFrame(
-                        parsed_data.tolist(), index=trades_df.index
-                    )
-                    final_trades["DATE"] = trades_df["DATE"]
-
-                    # Rename columns to the final format
-                    final_trades.rename(
-                        columns={
-                            "isin": "ISIN",
-                            "name": "NAME",
-                            "quantity": "QUANTITY",
-                            "price": "PRICE",
-                            "trade_type": "TRADE_TYPE",
-                        },
-                        inplace=True,
-                    )
-                    all_trades.append(final_trades)
-
-    if all_trades:
-        pd.concat(all_trades).to_csv(output_path / "trades.csv", index=False)
-        print(
-            f"Saved {len(pd.concat(all_trades))} trades to {output_path / 'trades.csv'}"
-        )
-
-    if all_transactions:
-        transactions_csv = output_path / "transactions.csv"
-        pd.concat(all_transactions).to_csv(transactions_csv, index=False)
-        print(
-            f"Saved {len(pd.concat(all_transactions))} transactions to {transactions_csv}"
-        )
-
-    # Validation
-    # if all_trades and all_transactions:
-    #     trades_csv = output_path / "trades.csv"
-    #     transactions_csv = output_path / "transactions.csv"
-    #     report = validate_extraction(
-    #         str(pdf_file), str(trades_csv), str(transactions_csv)
-    #     )
-    #     print_report(report)
-    #     print(
-    #         f"Saved {len(pd.concat(all_transactions))} transactions to {output_path / 'transactions.csv'}"
-    #     )
-
+        # 4. Mark Done
+        mark_file_processed(file_hash, pdf_file.name)
+        print("  - ✅ File marked as processed.")
 
 if __name__ == "__main__":
+    # multiprocessing freeze_support() for Windows compatibility if needed
+    multiprocessing.freeze_support()
     main()

@@ -18,10 +18,11 @@ from src.core.reporting import generate_report
 from src.data.market import get_price_map
 from src.core.validation import validate_final_report
 from src.utils.logging_config import get_logger
-from src.adapters.registry import AdapterRegistry
+from src.adapters.registry import AdapterRegistry, AdapterNotImplementedError
 from src.utils.schemas import HoldingsSchema
 import pandera as pa
 from datetime import datetime
+from scripts.update_registry import update_registry_interactive
 
 logger = get_logger(__name__)
 
@@ -47,41 +48,107 @@ def run_pipeline():
     """
     logger.info("--- Starting True Exposure Pipeline ---")
 
-    # --- Setup ---
-    adapter_registry = AdapterRegistry()
-
     # --- Phase 1 & 2 (Data Loading) ---
     direct_positions, etf_positions = load_positions_from_db()
     if direct_positions.empty and etf_positions.empty:
         logger.warning("--- Pipeline Halted: No positions found in the database. ---")
         return
+
+    # --- Phase 2.1: Registry Update (Human-in-the-Loop) ---
+    # Combine positions to scan for new assets. We rename columns to match what update_registry expects (ISIN, NAME)
+    # The DB load returns lowercase columns 'isin', 'name'
+    all_positions_scan = pd.concat([direct_positions, etf_positions])
+    all_positions_scan = all_positions_scan.rename(columns={'isin': 'ISIN', 'name': 'NAME'})
     
+    # Only run interactive update if we are in a TTY (terminal)
+    if sys.stdout.isatty():
+        update_registry_interactive(all_positions_scan)
+    else:
+        logger.info("Non-interactive mode detected. Skipping registry update prompt.")
+
+    # --- RE-SYNC DB with Registry ---
+    # The positions table might still have 'Stock' as asset_type if they were loaded before mapping.
+    # We must update the asset_type in the DB based on the new registry.
+    import sqlite3
+    import json
+    
+    registry_path = os.path.join(project_root, 'config', 'adapter_registry.json')
+    db_path = os.path.join(project_root, 'data', 'working', 'database', 'portfolio.db')
+    
+    if os.path.exists(registry_path) and os.path.exists(db_path):
+        try:
+            with open(registry_path, 'r') as f:
+                registry_data = json.load(f)
+            
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            updated_count = 0
+            for isin, provider in registry_data.items():
+                if provider and provider != "ignore":
+                    cursor.execute("UPDATE positions SET asset_type = 'ETF' WHERE ISIN = ?", (isin,))
+                    updated_count += cursor.rowcount
+            
+            conn.commit()
+            conn.close()
+            logger.info(f"--- Synced DB with Registry: Updated {updated_count} positions to 'ETF' ---")
+        except Exception as e:
+            logger.error(f"Failed to sync DB with registry: {e}")
+
+    # --- RE-LOAD Data (Critical) ---
+    # We must reload positions because the classification (ETF vs Stock) depends on the
+    # now-updated adapter_registry.json.
+    logger.info("--- Reloading positions with updated registry... ---")
+    direct_positions, etf_positions = load_positions_from_db()
+
+    # --- Setup Adapter Registry (after potential updates) ---
+    adapter_registry = AdapterRegistry()
+
     # --- Phase 2.5 (Market Data) ---
-    if not direct_positions.empty:
-        logger.info("--- Updating Direct Positions with Live Prices (yfinance) ---")
-        direct_isins = direct_positions['isin'].tolist()
-        live_prices = get_price_map(direct_isins)
+    # Combine to fetch prices for ALL assets (Stocks + ETFs)
+    all_positions = pd.concat([direct_positions, etf_positions], ignore_index=True)
+
+    if not all_positions.empty:
+        logger.info("--- Updating All Positions with Live Prices (yfinance) ---")
+        all_isins = all_positions['isin'].tolist()
+        live_prices = get_price_map(all_isins)
         
-        for index, row in direct_positions.iterrows():
+        for index, row in all_positions.iterrows():
             isin = row['isin']
             if isin in live_prices:
                 new_price = live_prices[isin]
                 quantity = row['quantity']
                 # Update price and market value
-                direct_positions.at[index, 'current_price'] = new_price
-                direct_positions.at[index, 'market_value'] = quantity * new_price
+                all_positions.at[index, 'current_price'] = new_price
+                all_positions.at[index, 'market_value'] = quantity * new_price
                 logger.debug(f"  - Updated {isin}: €{new_price:.2f}")
             else:
-                logger.warning(f"  - ⚠️ No live price for {isin}. Using database value: €{row['current_price']:.2f}")
+                price_val = row['current_price']
+                price_str = f"€{price_val:.2f}" if price_val is not None else "N/A"
+                logger.warning(f"  - ⚠️ No live price for {isin}. Using database value: {price_str}")
 
-    all_positions = pd.concat([direct_positions, etf_positions])
+    # Re-split for processing
+    direct_positions = all_positions[all_positions['asset_type'] != 'ETF'].copy()
+    etf_positions = all_positions[all_positions['asset_type'] == 'ETF'].copy()
 
     # --- Phase 3 (Aggregation) ---
     logger.info("--- Running Phase 3: Aggregation ---")
     etf_holdings_map = {}
     failed_etfs = [] # Now stores tuples of (isin, reason)
+    
+    # Load registry directly to check for 'ignore' status without instantiating adapter
+    # (AdapterRegistry.get_adapter returns None for unknown/ignore, but we want to distinguish)
+    # Actually, let's inspect the _isin_to_key map from the registry instance
+    registry_map = adapter_registry._isin_to_key
+
     for _, etf in etf_positions.iterrows():
         isin = etf['isin']
+        
+        # Check if ignored
+        if registry_map.get(isin) == "ignore":
+            logger.info(f"--- Skipping Ignored ETF: {etf['name']} ({isin}) ---")
+            continue
+
         holdings = pd.DataFrame()
         try:
             logger.info(f"--- Processing ETF: {etf['name']} ({isin}) ---")
@@ -104,6 +171,9 @@ def run_pipeline():
             etf_holdings_map[isin] = holdings
             logger.info(f"--- Successfully fetched and validated {len(holdings)} holdings for {etf['name']}. ---")
 
+        except AdapterNotImplementedError as e:
+            logger.warning(f"Skipping {etf['name']}: {e}")
+            failed_etfs.append((isin, f"Not Implemented: {e} (Added to Roadmap)"))
         except pa.errors.SchemaError as e:
             logger.error(f"Data contract validation failed for {etf['name']}: {e}")
             failed_etfs.append((isin, f"Validation Error: {e.args[0]}"))

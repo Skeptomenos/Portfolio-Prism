@@ -50,7 +50,7 @@ class XtrackersAdapter:
 
             logger.info("3. Successfully downloaded CSV data. Parsing into DataFrame...")
             # Use StringIO to treat the CSV string as a file for pandas
-            csv_data = StringIO(response.text)
+            csv_data = io.StringIO(response.text)
             
             # Read the CSV data, specifying the delimiter
             holdings_df = pd.read_csv(csv_data, sep=';')

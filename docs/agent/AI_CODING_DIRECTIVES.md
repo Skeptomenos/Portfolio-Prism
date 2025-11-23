@@ -1,65 +1,134 @@
-# AI Architect Directives
+# AI Architect Directives v2 (State-Aware & First Principles)
 
-### Phase 0: Task Management & Learning (CRITICAL)
+> **THE GOLDEN RULE OF CONTINUITY:**
+> You are part of a relay team. You are rarely the first and never the last.
+> 1. **Start** by reading `.context/active_state.md` and `.context/handover.md`.
+> 2. **Work** by updating `.context/active_state.md` when you complete a logical block of work.
+> 3. **Finish** by executing the Epilogue Protocol to preserve knowledge for the next agent.
+> **If you fail to update these files, your work is considered lost.**
 
-This phase governs the entire task lifecycle.
-
-**0.1: Initialization**
-- On a new task, create a unique, temporary log file (e.g., `.llm/logs/TASK_ID.md`).
-- In the log, state the `Objective`, `Initial Plan`, and any `Assumptions`.
-- Read the permanent `docs/agent/project_learnings.md` file (if it exists) and the agent's global memory to inform the plan.
-
-**0.2: Execution Loop**
-- Before every action (writing code, running a command), review the `Key Learnings & Constraints` section of the *current task's log*.
-- After every action, log the command, its outcome, and any key observations.
-- If an action fails or an assumption is invalidated, add a concise rule to the `Key Learnings & Constraints` section.
-- If the plan changes, log the reason for the `Pivot` and the new plan.
-
-**0.2.1: The OODA Loop for Debugging:** When an action fails (especially in web scraping), you MUST follow a strict OODA loop.
-    - **Observe:** Your first and only action after a failure is to gather evidence. For scraping, this means saving a screenshot and the full page source. You must then analyze this evidence.
-    - **Orient:** In your thought process, you must explicitly state your new orientation based *only* on the evidence from the screenshot/HTML. State what you saw and why your previous assumption was wrong.
-    - **Decide:** Formulate a *new, single, testable hypothesis*. (e.g., "My new hypothesis is that the correct selector is `...`").
-    - **Act:** Implement *only* the change required to test that single hypothesis. Do not add other changes.
-
-**0.3: Finalization & Learning Persistence**
-- On task completion, review the `Key Learnings & Constraints` section of the temporary log.
-- For each learning, decide its scope:
-    - **Project-Specific:** Append it to the permanent `docs/agent/project_learnings.md` file.
-    - **Global (Tool/Language Fact):** Use the `save_memory` tool to persist it.
-- Present a final summary of the work completed.
-- Delete the temporary log file.
+> **⚠️ THE "AD-HOC" ESCAPE HATCH:**
+> IF the user request is a simple question, a read-only query, or a task that does NOT modify the codebase (e.g., "How do I run this?", "List files in S3", "Explain this function"):
+> *   **SKIP** Phases 0, 1, 2, 3, 4.
+> *   **ACT** immediately. Do not generate state files. Do not archive. Just answer.
 
 ---
 
-### Phase 1: Design & Architect (IMPORTANT)
-- **Decompose:** Break the request into a feature plan and log it.
-- **Analyze Context:** Understand existing architecture, patterns, and data models.
-- **Design Data Schema:** Define clear, normalized schemas for new entities.
-- **Design API Contract:** Define explicit, RESTful contracts for new services.
-- **Design for Scalability:** Design services to be stateless. Plan caching strategies.
-- **Design for Asynchronicity (BEST PRACTICE):** For long-running tasks, prefer event-driven patterns.
+### Phase 0: Context & State Management (THE BRAIN)
 
-### Phase 2: Build & Implement (IMPORTANT)
-- **Search First (DRY):** Before writing, search for reusable components.
-- **Separate Concerns:** Isolate logic (UI vs. business vs. data access).
-- **Small, Focused Functions (BEST PRACTICE):** One job per function.
-- **Analyze Performance:** Avoid N+1 queries. Use efficient algorithms.
-- **Instrument for Observability:** Add structured logs, metrics, and traces for all new services.
+This phase replaces ephemeral logging with active state management to ensure continuity and learning.
 
-### Phase 3: Verify & Secure (CRITICAL)
-- **Write New Tests:** Add comprehensive tests for all new logic, including edge cases.
-- **Handle All Errors:** Gracefully handle all potential errors.
-- **Sanitize All Inputs:** Never trust external data.
-- **Mock External Systems:** In tests, mock all external services (APIs, DBs) for speed and reliability.
-- **Pass CI Gates:** Final code must pass all project-defined linters, builds, and security scans.
+**0.1: Initialization (Context Loading)**
+- **Check State:** Read `.context/active_state.md`.
+    - *Scenario A (Empty):* Read `.context/handover.md` (if exists) to get context. Initialize `.context/active_state.md` using the **Template** below.
+    - *Scenario B (Content Exists):* Compare the User's Prompt with the `Objective` in the file.
+        - **IF** the prompt is a sub-task/continuation: **RESUME** work (Update "Current Step").
+        - **IF** the prompt is a NEW, unrelated objective: **ARCHIVE** the old state (move to `.context/history/`) and **RESET** `.context/active_state.md` with the new Objective.
+- **Check Constraints:** Read `docs/PROJECT_LEARNINGS.md`.
+    - **IF EMPTY:** Log "No prior constraints found" in your state.
+    - **IF CONTENT EXISTS:** Identify 1-3 **Applied Constraints** relevant to this task and list them in your active state.
 
-### Phase 4: Deliver & Document (IMPORTANT)
-- **Update Documentation:** Update corresponding API docs, diagrams, and READMEs.
-- **Document Concisely (IMPORTANT):** All documentation must follow strict, concise formats.
-    - **Function/Method Docs:** Use JSDoc/equivalent. One sentence summary (max 15 words). Bulleted list for `@param`/`@returns`. No paragraphs.
-    - **README/Wiki Updates:** Use bullet points or short, declarative sentences. Max 2 sentences per paragraph.
-    - **Anti-Pattern:** Avoid conversational, narrative, or verbose explanations.
-- **Manage Database Changes (CRITICAL):** Generate a backward-compatible migration script for any schema modification.
-- **Ensure Backward Compatibility (CRITICAL):** Do not make breaking changes to public APIs without a versioning strategy.
-- **Use Feature Flags (BEST PRACTICE):** Wrap significant new features in a feature flag.
- 
+**Template for `.context/active_state.md`:**
+```markdown
+# 🟢 Active Session State
+**Objective:** [Concise Goal]
+**Status:** [Planning | In Progress | Debugging]
+
+## 🛡️ Applied Constraints
+- [Constraint 1 from PROJECT_LEARNINGS.md]
+
+## 📝 Plan & Progress
+- [ ] 1. [Step 1]
+- [ ] 2. [Step 2]
+
+## 🧠 Context & Learnings
+*   [Notes/Errors/Findings]
+```
+
+**0.2: State Maintenance (The Heartbeat)**
+- **Update Strategy:** You must update `.context/active_state.md` **at the end of every logical block of work** (e.g., after planning, after coding a module, after testing).
+- **Batching:** You may perform multiple related actions (edit 3 files) before updating the state, but you **MUST** update it before asking the user for input or ending your turn.
+- **Why?** The tool call is your proof of work. If your session crashes, the next agent relies on this file.
+
+**0.3: The OODA Loop (Debugging Protocol)**
+- When an action fails, **DO NOT** guess.
+    - **Observe:** Gather evidence (screenshot, HTML source, error trace).
+    - **Orient:** State explicitly in `.context/active_state.md` why your mental model was wrong based on the evidence.
+    - **Decide:** Formulate a single, testable hypothesis.
+    - **Act:** Implement the minimal change to test that hypothesis.
+
+---
+
+### Phase 1: Analysis & Architecture (FIRST PRINCIPLES)
+
+Do not plan the solution until you have deconstructed the problem.
+
+**1.1: Recursive Decomposition (The Knife)**
+- **Complexity Threshold:** IF the task is simple (< 50 lines of code, single script), **SKIP** decomposition and proceed to Implementation.
+- **Deconstruct:** Break complex requests down into **Atomic Units**.
+- **Definition:** An Atomic Unit is a problem so small that it:
+    1.  Has zero external dependencies (Pure Logic).
+    2.  Can be solved with a single function/class.
+    3.  Can be verified with a single unit test.
+- **The 'Why' Test:** For every component, ask "Why does this exist?" The answer must be "to transform Input A to Output B."
+
+**1.2: Modularity (The Box)**
+- **Group:** Organize Atomic Units into logical **Modules**.
+- **Interface:** Define strict **Data Contracts** (Interfaces/Schemas) between modules.
+- **Constraint:** High Cohesion (related things stay together) and Low Coupling (modules rarely touch).
+
+**1.3: Radical Simplicity (The Filter)**
+- **Buy vs. Build:** Before implementing an Atom, check if a Standard Library or approved dependency solves it.
+- **Implementation:** Use the most readable, standard solution. **Complexity is a failure of decomposition.**
+
+---
+
+### Phase 2: Build & Implement (BOTTOM-UP)
+
+**2.1: Construction Order**
+- **Atoms First:** Implement the Atomic Units (Pure Logic) first.
+- **Verify Early:** Write unit tests for Atoms immediately. You are testing math/logic, not side effects.
+- **Orchestration Last:** Only write the "Glue Code" (Scripts/Controllers) after the building blocks are proven solid.
+
+**2.2: Strict Logic/IO Separation**
+- **Pure Logic:** Core calculations must never touch the network, disk, or database.
+- **I/O Edge:** Push all side effects to the boundaries (Adapters/Services).
+- **Benefit:** This makes the core logic 100% testable without mocks.
+
+**2.3: Persistence & Safety**
+- **Data Integrity:** Any change to a persistent data structure (DB Schema, File Format, API Response) requires a **Migration Strategy** (Backward Compatibility).
+- **Safety Toggles:** Wrap any high-risk logic (e.g., bulk deletions, new critical paths) in a Feature Flag or Configuration Switch.
+
+---
+
+### Phase 3: Verify & Secure (TWO-TIERED)
+
+**3.1: Unit Tests (The Microscope)**
+- Test Atomic Units in isolation.
+- Mock all external dependencies.
+
+**3.2: Contract Tests (The Handshake)**
+- Validate data consistency at the boundaries.
+- **Definition:** Assert that the Output of Module A matches the expected Input Schema of Module B (e.g., check column names, data types, and non-null constraints using libraries like **Pydantic**, **Pandas Schema**, or **JSON Schema**).
+- **Fail Fast:** Validate inputs at the entry point of every module.
+
+---
+
+### Phase 4: Delivery & Epilogue (DEFINITION OF DONE)
+
+You are **NOT** done until you have executed this sequence:
+
+**4.1: Documentation Sync (Audit Trail)**
+- [ ] **User Facing:** Update `CHANGELOG.md` if features or usage changed.
+- [ ] **Dev Facing:** Append to `docs/DECISION_LOG.md` if you made architectural trade-offs.
+- [ ] **Code Facing:** Ensure docstrings match the new code reality.
+
+**4.2: Recursive Learning (Synthesis)**
+- [ ] **Reflect:** Review your session in `.context/active_state.md`.
+- [ ] **Extract:** Identify **one** reusable pattern or anti-pattern.
+- [ ] **Commit:** Update `docs/PROJECT_LEARNINGS.md` with this new rule. (Do not dump logs; distill wisdom).
+
+**4.3: Archival Rotation (Continuity)**
+- [ ] **Preparation:** Ensure `.context/history/` directory exists.
+- [ ] **Archive:** Move `.context/active_state.md` to `.context/history/YYYY-MM-DD_TaskName.md`.
+- [ ] **Handover:** Create/Overwrite `.context/handover.md` with a 3-bullet summary of "Where we are" and "Next Steps" for the next agent.

@@ -46,9 +46,40 @@ def generate_report(input_filepath: str = "outputs/true_exposure_report.csv"):
         # Use a left merge to keep all original exposure data
         final_df = pd.merge(exposure_df, enriched_df, on='isin', how='left')
 
+        # Check for missing values in exposure data (due to missing prices)
+        missing_value_mask = final_df['total_exposure'].isna()
+        missing_value_count = missing_value_mask.sum()
+        
+        if missing_value_count > 0:
+            logger.warning(f"  - ⚠️  {missing_value_count} assets have missing value data (Price not found). They are excluded from total portfolio value.")
+            # Fill NaNs with 0.0 for calculation purposes so they don't break sums
+            final_df['total_exposure'] = final_df['total_exposure'].fillna(0.0)
+            final_df['direct'] = final_df['direct'].fillna(0.0)
+            final_df['indirect'] = final_df['indirect'].fillna(0.0)
+
+        # --- Fill Missing Metadata based on Asset Class ---
+        if 'asset_class' in final_df.columns:
+            # Cash
+            cash_mask = final_df['asset_class'] == 'Cash'
+            final_df.loc[cash_mask, 'sector'] = final_df.loc[cash_mask, 'sector'].fillna('Cash & Equivalents')
+            final_df.loc[cash_mask, 'geography'] = final_df.loc[cash_mask, 'geography'].fillna('Global')
+
+            # Derivatives
+            deriv_mask = final_df['asset_class'] == 'Derivative'
+            final_df.loc[deriv_mask, 'sector'] = final_df.loc[deriv_mask, 'sector'].fillna('Derivatives')
+            final_df.loc[deriv_mask, 'geography'] = final_df.loc[deriv_mask, 'geography'].fillna('Global')
+
+        # Fill remaining gaps
+        final_df['sector'] = final_df['sector'].fillna('Unknown')
+        final_df['geography'] = final_df['geography'].fillna('Unknown')
+
         # Reorder columns for better readability
-        cols = ['isin', 'name_y', 'sector', 'geography', 'direct', 'indirect', 'total_exposure', 'portfolio_percentage']
-        final_df = final_df[cols]
+        # Check if asset_class exists in columns to include it
+        base_cols = ['isin', 'name_y', 'sector', 'geography', 'direct', 'indirect', 'total_exposure', 'portfolio_percentage']
+        if 'asset_class' in final_df.columns:
+             base_cols.insert(2, 'asset_class')
+        
+        final_df = final_df[base_cols]
         final_df.rename(columns={'name_y': 'name'}, inplace=True)
         
         # --- Generate Analysis Reports ---

@@ -208,3 +208,16 @@ This section is a reference library of solutions to specific technical challenge
     - **Problem:** Enrichment for European stocks failed consistently because the adapters (specifically iShares) were discarding the `ISIN` column and passing raw tickers (e.g., `NESN`) to `yfinance`. `yfinance` requires an exchange suffix (e.g., `NESN.SW`) for non-US assets, but *will* accept an ISIN directly (`CH0038863350`).
     - **Solution:** The fix is two-fold: 1) Update adapters to preserve the `ISIN` column from source files. 2) Filter out garbage identifiers (like `_CURRENCYUSD`) in the aggregation layer before enrichment.
     - **Principle:** **Prioritize Universal Identifiers.** When dealing with global data, always prefer ISINs over tickers, as tickers are ambiguous without an exchange suffix.
+
+- **Strategy: Configuration via 'Human-in-the-Loop' (Phase 8)**
+  - **Problem:** The `adapter_registry.json` needed constant manual updates whenever the user bought a new ETF. Attempting to "guess" the provider from the ETF name using regex is brittle and prone to misclassification.
+  - **Solution:** We implemented an interactive CLI workflow (`scripts/update_registry.py`). When a new ISIN is detected, the system *asks the user* to classify it once. It validates the user's choice against the ETF name to catch typos (e.g., selecting "iShares" for a "Vanguard" fund).
+  - **Principle:** **Determinism over Magic.** For critical configuration that dictates data fetching strategy, it is better to ask the user for a definitive answer once than to rely on "smart" but fallible heuristics.
+
+- **Case Study: Ticker Normalization for Global Markets (Phase 8)**
+  - **Problem:** `yfinance` is extremely strict about ticker formats. While `RR.L` works, `RR.` (common in UK data) or `388` (Hong Kong) fail with 404s.
+  - **Solution:** We reverse-engineered the specific formatting rules for key exchanges:
+    - **UK:** Remove trailing dots (`RR.` -> `RR.L`).
+    - **Hong Kong:** Zero-pad to 4 digits (`388` -> `0388.HK`).
+    - **Spaces:** Replace with hyphens (`NOVO B` -> `NOVO-B.CO`).
+  - **Principle:** **Data cleaning is domain-specific.** A generic "clean" function is insufficient. You must understand the specific idiosyncrasies of your downstream consumer (in this case, Yahoo Finance) to effectively normalize data.

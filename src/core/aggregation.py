@@ -10,6 +10,7 @@ if project_root not in sys.path:
 
 from src.data.manager import load_positions_from_db
 from src.data.enrichment import enrich_securities
+from src.utils.classification import classify_holding
 
 from src.utils.logging_config import get_logger
 
@@ -36,16 +37,14 @@ def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
             aggregated_exposures[isin] = {
                 'name': row['name'],
                 'direct': row['market_value'],
-                'indirect': 0.0
+                'indirect': 0.0,
+                'sector': 'Direct Holding', # Temporary default, ideally enriched too
+                'geography': 'Global'
             }
-    if not direct_positions.empty:
-        for _, row in direct_positions.iterrows():
-            isin = row['isin']
-            aggregated_exposures[isin] = {
-                'name': row['name'],
-                'direct': row['market_value'],
-                'indirect': 0.0
-            }
+            # Note: Direct holdings enrichment happens in reporting.py usually, 
+            # or we should enrich them here if we want consistent 'sector' data in the aggregation step.
+            # For now, we keep the existing flow where reporting.py enriches the final list.
+            
     logger.info("Direct holdings processed.")
 
     # 2. Process Indirect Holdings
@@ -61,16 +60,35 @@ def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
             if etf_holdings is None or etf_holdings.empty:
                 logger.warning(f"    - No holdings found for {etf_isin} in the provided map. Skipping.")
                 continue
+            
+            # Make a copy to avoid SettingWithCopy warnings on the original dataframe in the map
+            etf_holdings = etf_holdings.copy()
 
-            # If 'isin' column is missing, enrich the data to get it
+            # --- Step 1: Classification ---
+            # Apply classification logic to identify Cash/Derivatives
+            etf_holdings['asset_class'] = etf_holdings.apply(
+                lambda x: classify_holding(x.get('ticker', ''), x.get('name', '')), axis=1
+            )
+            
+            non_equity_count = len(etf_holdings[etf_holdings['asset_class'] != 'Equity'])
+            if non_equity_count > 0:
+                logger.info(f"    - Classified {non_equity_count} rows as Non-Equity (Cash/Derivatives).")
+
+            # --- Step 2: Enrichment (Equity Only) ---
+            # Only enrich rows classified as Equity
+            equity_mask = etf_holdings['asset_class'] == 'Equity'
+            equity_holdings = etf_holdings[equity_mask]
+
+            # If 'isin' column is missing (iShares), enrich to get it
+            # Note: We only need to fetch metadata/ISINs for Equities.
             if 'isin' not in etf_holdings.columns:
-                logger.info("    - 'isin' column not found. Enriching holdings data to get ISINs...")
+                logger.info("    - 'isin' column not found. Enriching Equity holdings data...")
                 
-                # --- FIX: Filter out rows with invalid tickers before enrichment ---
-                etf_holdings.dropna(subset=['ticker'], inplace=True)
-                etf_holdings = etf_holdings[etf_holdings['ticker'].apply(lambda x: isinstance(x, str))]
+                # Filter out rows with invalid tickers before enrichment
+                equity_holdings = equity_holdings.dropna(subset=['ticker'])
+                equity_holdings = equity_holdings[equity_holdings['ticker'].apply(lambda x: isinstance(x, str))]
 
-                holdings_list = etf_holdings.to_dict('records')
+                holdings_list = equity_holdings.to_dict('records')
                 enriched_holdings = enrich_securities(holdings_list)
                 
                 if enriched_holdings:
@@ -79,22 +97,39 @@ def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
                     enriched_df = pd.DataFrame(columns=['ticker', 'isin'])
 
                 if 'ticker' in enriched_df.columns and 'ticker' in etf_holdings.columns:
+                    # Merge enrichment back into main dataframe
                     etf_holdings = pd.merge(etf_holdings, enriched_df[['ticker', 'isin']], on='ticker', how='left')
                     logger.info("    - Enrichment complete. Merged ISINs into holdings.")
                     
+                    # Fill missing ISINs for Non-Equities with a placeholder
                     missing_isin_mask = etf_holdings['isin'].isnull()
-                    etf_holdings.loc[missing_isin_mask, 'isin'] = [f"UNKNOWN_ISIN_{i}" for i in range(missing_isin_mask.sum())]
+                    etf_holdings.loc[missing_isin_mask, 'isin'] = [f"NON_EQUITY_{i}" for i in range(missing_isin_mask.sum())]
                 else:
                     logger.error("    - Cannot merge enriched data due to missing 'ticker' column.")
-                    etf_holdings['isin'] = [f"UNKNOWN_ISIN_{i}" for i in range(len(etf_holdings))]
-
+                    etf_holdings['isin'] = [f"UNKNOWN_{i}" for i in range(len(etf_holdings))]
+            
+            # Calculate indirect value
             etf_holdings['indirect'] = etf_holdings['weight_percentage'] / 100 * etf_market_value
             all_holdings = pd.concat([all_holdings, etf_holdings])
 
     if not all_holdings.empty:
+        # We need to preserve asset_class info for reporting
+        # But aggregation groups by ISIN. 
+        # 'NON_EQUITY_X' ISINs are unique per ETF load (because of range index).
+        # This means Cash won't be aggregated across ETFs.
+        # To fix this, we should standardize ISINs for Cash.
+        
+        # Normalize Cash ISINs
+        cash_mask = all_holdings['asset_class'] == 'Cash'
+        all_holdings.loc[cash_mask, 'isin'] = 'CASH_USD' # Simplification
+        all_holdings.loc[cash_mask, 'name'] = 'Cash & Equivalents'
+        
+        # Normalize Derivative ISINs? Maybe keep unique to see what they are.
+        
         aggregated_indirect = all_holdings.groupby('isin').agg(
             indirect=('indirect', 'sum'),
-            name=('name', 'first')
+            name=('name', 'first'),
+            asset_class=('asset_class', 'first')
         ).reset_index()
 
         for _, row in aggregated_indirect.iterrows():
@@ -105,7 +140,8 @@ def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
                 aggregated_exposures[isin] = {
                     'name': row['name'],
                     'direct': 0.0,
-                    'indirect': row['indirect']
+                    'indirect': row['indirect'],
+                    'asset_class': row.get('asset_class', 'Equity')
                 }
     logger.info("Indirect holdings processed.")
     # --- Finalize and Formatting Output ---
@@ -118,7 +154,8 @@ def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
             'isin': isin,
             'name': data['name'],
             'direct': data.get('direct', 0.0),
-            'indirect': data.get('indirect', 0.0)
+            'indirect': data.get('indirect', 0.0),
+            'asset_class': data.get('asset_class', 'Equity') # Pass this to reporting
         })
 
     if not final_holdings:

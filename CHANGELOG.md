@@ -2,12 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- **Roadmap Automation**: Implemented a "Feature Gap Detector" that automatically captures unimplemented providers (e.g., Vanguard) and logs them to `docs/BACKLOG.md`.
+- **Quality Reporting**: The pipeline now generates `outputs/data_quality_report.txt`, explicitly listing skipped ETFs and the reason for exclusion (e.g., "Provider not implemented").
+- **Registry Automation**: Implemented an interactive "Setup Wizard" (`scripts/update_registry.py`) integrated into the main pipeline. It detects new/unknown ISINs and prompts the user to map them to an adapter (iShares, Amundi, etc.) or ignore them.
+  - Includes safety validation to warn if the selected provider doesn't match the ETF name.
+  - Persists "ignore" choices to prevent repetitive prompting.
+
 ### Fixed
-- **Enrichment Failure**: Identified and diagnosing a critical issue where European assets were failing enrichment (404s).
-  - **Root Cause**: Adapters were discarding ISINs and relying on raw tickers (e.g., `NESN`), which `yfinance` rejects without a suffix.
-  - **Solution**: Adapters are being updated to preserve ISINs, which `yfinance` handles correctly.
-- **Data Quality**: Identified "garbage" identifiers (e.g., `_CURRENCYUSD`, `UNKNOWN_ISIN`) in the enrichment queue.
-  - **Solution**: Adding pre-enrichment filtering in `aggregation.py` to remove non-equity holdings.
+- **Enrichment Failure (Europe)**: Fixed widespread 404 errors in `yfinance` enrichment for European assets.
+  - **Root Cause**: iShares adapter was extracting raw tickers (e.g., `RR.`, `NESN`) which Yahoo rejects.
+  - **Solution**: `ISharesAdapter` now captures exchange metadata (`Standort`, `Börse`) and intelligently generates Yahoo-compatible suffixes (e.g., `RR.L`, `NESN.SW`, `0388.HK`).
+- **Data Quality**: `aggregation.py` now explicitly filters out garbage rows (e.g., `_CURRENCYUSD`, `NaN` tickers) before they reach the enrichment layer, cleaning up reports.
 
 ---
 

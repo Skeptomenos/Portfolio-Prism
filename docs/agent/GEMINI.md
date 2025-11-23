@@ -4,28 +4,24 @@ This document provides instructions for AI agents operating in this repository.
 
 ## Task Lifecycle & Learning Protocol (Phase 0) - CRITICAL
 
-This protocol is the highest priority and governs the entire lifecycle of every task.
-
-**1. Initialization:**
-- On any new task, create a temporary log file (e.g., `.llm/logs/TASK_ID.md`).
-- In the log, state the `Objective`, `Initial Plan`, and any `Assumptions`.
-- **Crucially, you must read the permanent `docs/agent/project_learnings.md` file. Your plan MUST explicitly address how it will follow the 'Core Principles & Mandates' outlined within it.**
+**1. Initialization (Context Loading):**
+- **Read `.context/active_state.md`**.
+- **Read `.context/handover.md`**.
+- **Read `docs/PROJECT_LEARNINGS.md`**.
+- Compare the user's prompt with the active state.
+    - If continuing: **RESUME** and update the state.
+    - If new: **ARCHIVE** the old state and **RESET**.
 
 **2. Execution Loop:**
-- Before every action, review the `Key Learnings & Constraints` in your current task log.
-- After every action, log the command, its outcome, and key observations.
-- If an action fails or an assumption is proven wrong, add a new, concise rule to the `Key Learnings & Constraints` section of your task log.
-- **0.2.1: The OODA Loop for Debugging:** When an action fails (especially in web scraping), you MUST follow a strict OODA loop.
-    - **Observe:** Your first and only action after a failure is to gather evidence. For scraping, this means saving a screenshot and the full page source. You must then analyze this evidence.
-    - **Orient:** In your thought process, you must explicitly state your new orientation based *only* on the evidence from the screenshot/HTML. State what you saw and why your previous assumption was wrong.
-    - **Decide:** Formulate a *new, single, testable hypothesis*. (e.g., "My new hypothesis is that the correct selector is `...`").
-    - **Act:** Implement *only* the change required to test that single hypothesis. Do not add other changes.
+- Update `.context/active_state.md` at the end of every logical block.
+- Use the OODA Loop (Observe-Orient-Decide-Act) for debugging.
+- **DO NOT** use ephemeral log files anymore. Use the persistent state.
 
-**3. Finalization & Learning Persistence:**
-- On task completion, review the learnings from your temporary log.
-- Append any new, project-specific learnings to the permanent `docs/agent/project_learnings.md` file.
-- Use the `save_memory` tool for any new global learnings.
-- Delete the temporary log file.
+**3. Finalization:**
+- Update `CHANGELOG.md` and `docs/DECISION_LOG.md`.
+- Update `docs/PROJECT_LEARNINGS.md` with new wisdom.
+- Move `.context/active_state.md` to `.context/history/`.
+- Create `.context/handover.md` for the next agent.
 
 ## Core Principles
 
@@ -57,13 +53,15 @@ This protocol is the highest priority and governs the entire lifecycle of every 
 -   **Run all tests:** `pytest`
 -   **Run a single test:** `pytest path/to/test_file.py::test_function_name`
 
-## Code Style Guidelines
+## Code Style & Standards
 
--   **Imports:** Use `isort` conventions (via `ruff`): sorted alphabetically, grouped by standard library, third-party, and local modules.
--   **Formatting:** Adhere to PEP 8, enforced by `ruff format`.
--   **Types:** Use type hints for all function signatures.
--   **Naming:** Use `snake_case` for variables and functions, `PascalCase` for classes.
--   **Error Handling:** Use `try...except` blocks for file I/O and API calls. Raise specific exceptions where appropriate.
+**CRITICAL:** All code must adhere strictly to the rules defined in **`docs/agent/CODING_STANDARDS.md`**.
+This includes:
+- **Formatting:** PEP 8, Imports, Variables.
+- **Typing:** Mandatory Type Hints.
+- **Comments:** Standard English docstrings (No "telegraphic" style in code).
+- **Security:** Zero Trust for secrets and inputs.
+- **Logging:** Centralized logging (No `print()`).
 
 ## Project Structure
 

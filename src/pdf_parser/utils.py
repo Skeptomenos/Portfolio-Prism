@@ -44,11 +44,15 @@ def parse_description(description: str) -> Dict[str, Optional[str]]:
     # Extract quantity
     qty_match = re.search(r"quantity:\s*([\d.,]+)", description)
     if qty_match:
-        result["quantity"] = float(qty_match.group(1).replace(",", "."))
+        # German format: 1.234,56 -> remove dots, replace comma with dot
+        qty_str = qty_match.group(1).replace(".", "").replace(",", ".")
+        result["quantity"] = float(qty_str)
 
     # Extract price
     price_match = re.search(r"price:\s*([\d.,]+)", description)
     if price_match:
-        result["price"] = float(price_match.group(1).replace(",", "."))
+        # German format: 1.234,56 -> remove dots, replace comma with dot
+        price_str = price_match.group(1).replace(".", "").replace(",", ".")
+        result["price"] = float(price_str)
 
     return result

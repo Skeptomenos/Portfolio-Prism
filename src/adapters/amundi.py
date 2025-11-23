@@ -7,6 +7,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+try:
+    # Monkeypatch pandas to support 'calamine' engine if installed
+    from python_calamine.pandas import pandas_monkeypatch
+    pandas_monkeypatch()
+    CALAMINE_AVAILABLE = True
+except ImportError:
+    CALAMINE_AVAILABLE = False
+
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -27,36 +35,66 @@ class AmundiAdapter:
         df = None
         
         # Try to load the file
+        # Strategy: Try XLSX first (default -> calamine). If missing or broken, try CSV.
+        
         if os.path.exists(xlsx_path):
             logger.info(f"  - ✅ Found manual file: {xlsx_path}")
             try:
                 # "Header Hunting" Strategy
-                # Amundi files are inconsistent; headers might be on row 0, 9, 12, etc.
-                # We scan the first 30 rows to find the true header.
-                temp_df = pd.read_excel(xlsx_path, header=None, nrows=30)
+                temp_df = None
+                try:
+                    temp_df = pd.read_excel(xlsx_path, header=None, nrows=30)
+                except Exception as e_default:
+                    if CALAMINE_AVAILABLE:
+                        logger.warning(f"    - Default engine failed ({e_default}). Retrying with 'calamine'...")
+                        temp_df = pd.read_excel(xlsx_path, header=None, nrows=30, engine="calamine")
+                    else:
+                        raise e_default
+
                 header_row_idx = None
                 
                 for i, row in temp_df.iterrows():
-                    # Convert row to string, lower case, check for key terms
                     row_str = row.astype(str).str.lower().tolist()
                     if 'isin' in row_str and 'name' in row_str:
                         header_row_idx = i
                         break
                 
+                read_engine = "calamine" if CALAMINE_AVAILABLE else None # Prefer default if calamine not strictly needed/available, but we already loaded temp_df so likely need it. 
+                # Actually, if temp_df succeeded, we know which engine works.
+                # But 'read_excel' with engine=None defaults to openpyxl/xlrd.
+                # If we are here, temp_df worked.
+                
                 if header_row_idx is not None:
                     logger.info(f"    - Detected header at row {header_row_idx}")
-                    df = pd.read_excel(xlsx_path, header=header_row_idx)
+                    try:
+                        df = pd.read_excel(xlsx_path, header=header_row_idx)
+                    except:
+                        if CALAMINE_AVAILABLE:
+                             df = pd.read_excel(xlsx_path, header=header_row_idx, engine="calamine")
+                        else: raise
                 else:
-                    logger.warning("    - Could not detect header row (missing 'ISIN'/'Name'). Trying header=0 fallback.")
-                    df = pd.read_excel(xlsx_path, header=0)
+                    logger.warning("    - Could not detect header row. Trying header=0.")
+                    try:
+                        df = pd.read_excel(xlsx_path, header=0)
+                    except:
+                        if CALAMINE_AVAILABLE:
+                            df = pd.read_excel(xlsx_path, header=0, engine="calamine")
+                        else: raise
 
             except Exception as e:
                 logger.error(f"    - Failed to read manual XLSX: {e}")
+                df = None # Ensure None so we fall through to CSV
 
-        elif os.path.exists(csv_path):
+        # Fallback to CSV if XLSX failed or didn't exist
+        if df is None and os.path.exists(csv_path):
             logger.info(f"  - ✅ Found manual file: {csv_path}")
             try:
-                df = pd.read_csv(csv_path)
+                # Try reading with different separators
+                try:
+                    df = pd.read_csv(csv_path, sep=';') # Common in Europe
+                    if len(df.columns) < 2: raise ValueError("Not enough columns with ';'")
+                except:
+                    df = pd.read_csv(csv_path, sep=',')
             except Exception as e:
                  logger.error(f"    - Failed to read manual CSV: {e}")
 

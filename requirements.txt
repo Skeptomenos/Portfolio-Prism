@@ -8,3 +8,5 @@ selenium
 selenium-wire
 cryptography
 pandera
+python-calamine
+yfinancetqdm

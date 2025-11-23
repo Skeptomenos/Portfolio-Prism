@@ -33,6 +33,8 @@ Run the master script to parse PDFs, update the database, and generate the repor
 bash run.sh
 ```
 
+> **Note:** If the system detects a new ETF in your portfolio that it hasn't seen before, it will pause and ask you to select the correct provider (e.g., iShares, Amundi). Your choice will be saved for future runs.
+
 ## 5. View Results
 The analysis is saved to the `outputs/` directory:
 *   `outputs/true_exposure_report.csv`: Full look-through exposure list.
@@ -40,5 +42,4 @@ The analysis is saved to the `outputs/` directory:
 *   `outputs/trades.csv`: Parsed transaction history.
 
 ## 6. Troubleshooting
-*   **"No adapter registered":** Check `config/adapter_registry.json` and ensure the ISIN is mapped to a provider.
 *   **Amundi Errors:** Ensure the manual XLSX file is in `data/inputs/manual_holdings/` and is a valid Excel file.

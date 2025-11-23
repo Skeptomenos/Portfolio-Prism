@@ -2,6 +2,7 @@ import json
 import os
 import requests
 import time
+import yfinance as yf
 from dotenv import load_dotenv
 
 # Add project root to path to allow absolute imports
@@ -20,6 +21,25 @@ FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
 FINNHUB_API_URL = 'https://finnhub.io/api/v1'
 
 # --- Helper Functions ---
+
+def fetch_from_yfinance(identifier):
+    """
+    Attempts to fetch metadata from YFinance using the identifier (ISIN or Ticker).
+    Returns a dictionary with 'sector', 'geography', and 'name' or None if failed.
+    """
+    try:
+        ticker = yf.Ticker(identifier)
+        info = ticker.info
+        # Check if we actually got valid data (YFinance sometimes returns empty info dicts)
+        if info and ('sector' in info or 'country' in info):
+            return {
+                'name': info.get('longName') or info.get('shortName') or 'N/A',
+                'sector': info.get('sector', 'Unknown'),
+                'geography': info.get('country', 'Unknown')
+            }
+    except Exception:
+        pass
+    return None
 
 def enrich_securities_bulk(securities_to_fetch, force_refresh=False):
     """
@@ -52,52 +72,56 @@ def enrich_securities_bulk(securities_to_fetch, force_refresh=False):
         if not force_refresh:
             cached_data = load_from_cache(cache_key)
             if cached_data:
-                enriched_results.append(cached_data)
-                # Visual feedback for cache hit
-                print(".", end="", flush=True)
-                count += 1
-                continue
+                # Simple validation: if cached data is "Unknown", treat as cache miss to try fallback
+                if cached_data.get('sector') != 'Unknown' and cached_data.get('geography') != 'Unknown':
+                    enriched_results.append(cached_data)
+                    # Visual feedback for cache hit
+                    print(".", end="", flush=True)
+                    count += 1
+                    continue
 
         # 2. If not in cache or force_refresh is True, call the API
+        result = {
+            'ticker': identifier, 'isin': 'N/A', 'name': 'Not Found',
+            'sector': 'Unknown', 'geography': 'Unknown'
+        }
+        
+        # Primary: Finnhub
         try:
             response = session.get(f"{FINNHUB_API_URL}/stock/profile2", params={'symbol': identifier})
-            response.raise_for_status()
-            profile_data = response.json()
-
-            if profile_data:
-                result = {
-                    'ticker': profile_data.get('ticker', identifier),
-                    'isin': profile_data.get('isin', 'N/A'),
-                    'name': profile_data.get('name', 'N/A'),
-                    'sector': profile_data.get('finnhubIndustry', 'Unknown'),
-                    'geography': profile_data.get('country', 'Unknown')
-                }
-            else:
-                result = {
-                    'ticker': identifier, 'isin': 'N/A', 'name': 'Not Found',
-                    'sector': 'Unknown', 'geography': 'Unknown'
-                }
+            # response.raise_for_status() # Don't raise, just fall through to fallback
+            if response.status_code == 200:
+                profile_data = response.json()
+                if profile_data:
+                    result = {
+                        'ticker': profile_data.get('ticker', identifier),
+                        'isin': profile_data.get('isin', 'N/A'),
+                        'name': profile_data.get('name', 'N/A'),
+                        'sector': profile_data.get('finnhubIndustry', 'Unknown'),
+                        'geography': profile_data.get('country', 'Unknown')
+                    }
+                    # Visual feedback for API hit
+                    print("F", end="", flush=True) # F for Finnhub
+                else:
+                    # Finnhub returned empty, try fallback
+                    pass
             
-            # 3. Save to cache and append to results
-            save_to_cache(cache_key, result)
-            enriched_results.append(result)
-
             # Rate Limiting: Finnhub Free Tier is 60 calls/min (~1 call/sec)
-            # We sleep for 1.1s to be safe.
             time.sleep(1.1)
-            # Visual feedback for API hit
-            print("*", end="", flush=True)
 
-        except requests.exceptions.RequestException as e:
-            # ... (Error handling) ...
-            enriched_results.append({
-                'ticker': identifier, 'isin': 'N/A', 'name': 'API Error',
-                'sector': 'Unknown', 'geography': 'Unknown'
-            })
-            # Sleep even on error
-            time.sleep(1.1)
+        except requests.exceptions.RequestException:
             print("x", end="", flush=True)
 
+        # Fallback: YFinance (if Finnhub failed or returned Unknown)
+        if result['sector'] == 'Unknown' or result['geography'] == 'Unknown':
+            yf_data = fetch_from_yfinance(identifier)
+            if yf_data:
+                result.update(yf_data)
+                print("Y", end="", flush=True) # Y for YFinance
+
+        # 3. Save to cache and append to results
+        save_to_cache(cache_key, result)
+        enriched_results.append(result)
         count += 1
             
     print(" Done.")
