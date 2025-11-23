@@ -3,16 +3,14 @@
 **Last Agent:** Gemini
 
 ## 🏁 What was accomplished?
-- **Phase 6 Complete:** Reliability & Gap Closure.
-- **iShares Solved:** Auto-discovery of `product_id` implemented. No more manual config editing.
-- **Noise Silenced:** `enrichment.py` now filters out 404-prone internal identifiers.
-- **Clean Config:** Removed invalid test cases.
+- **System Validated:** The pipeline is verified to be stable, interactive, and self-healing.
+- **User Run Success:** Manual execution confirmed all new reliability features (ticker map, registry update, noise filtering) are working.
+- **Documentation:** Project status and changelog updated to reflect the validated state.
 
 ## 🚧 Where are we? (Current State)
-- **Pipeline:** Highly reliable, instrumented, and quiet.
-- **Data Gaps:** Minimally existent.
-- **Next Phase:** Phase 7 (Optimization & Polish) + Backlog Execution.
+- **Status:** Maintenance / Production Ready.
+- **Data Health:** Excellent, with one known ticker issue (`IE0031442068`).
 
-## ⏭️ Next Steps (Immediate Action Required)
-1.  **Phase 7:** Pick an item from `docs/BACKLOG.md` (likely Vanguard adapter).
-2.  **Dashboard:** Continue refining the Streamlit app based on user feedback.
+## ⏭️ Next Steps (User Actions)
+1.  **Explore:** Run `./run_dashboard.sh` to see the visualizations.
+2.  **Fix IUSA:** On the next run, provide a valid ticker (e.g., `IUSA.L`) for `IE0031442068` when prompted.

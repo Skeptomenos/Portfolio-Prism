@@ -1,19 +1,17 @@
 # Project Status
 
-**Current Phase:** Phase 7: Optimization & Polish
+**Current Phase:** Maintenance & Backlog
 **Date:** 2025-11-23
 
 ## ✅ Recent Accomplishments
-- **Reliability:** Implemented automated iShares `product_id` discovery, closing the 2.6% data gap.
-- **Noise Reduction:** Filtered out `_CURRENCY` and `NON_EQUITY` from enrichment to prevent API spam.
-- **Data Quality:** Removed invalid test cases (ThyssenKrupp -> Vanguard) from the registry.
-- **Interactive Mapping:** Validated the "Ticker Map" feature for direct holdings.
+- **Validation Complete:** User successfully ran the pipeline end-to-end with live data.
+- **iShares Automation:** Verified "Zero-Touch" discovery of product IDs.
+- **Interactive Features:** Verified Ticker Mapping and Registry Update prompts work as designed.
+- **Noise Reduction:** Validated that log noise from non-equity assets is eliminated.
 
 ## 🚧 Current Focus
-- **Backlog Execution:** Implementing missing adapters (e.g., Vanguard) identified by the roadmap automation.
-- **Performance:** Optimizing the dashboard load time and pipeline execution speed.
-- **UX Polish:** Refining the dashboard visualization and interactivity.
+- **Maintenance:** Monitoring for new ETF providers or data format changes.
+- **Backlog:** Implementing new adapters (e.g., Vanguard) as requested.
 
 ## 📉 Known Issues / Risks
-- **Adapter Coverage:** Vanguard and other providers are still missing (tracked in Backlog).
-- **Interactive Dependencies:** Some features (Ticker Map, Registry Update) require an interactive terminal, which can be a limitation for automated background runs.
+- **IUSA Ticker:** ISIN `IE0031442068` requires a manual ticker mapping update (e.g., `IUSA.L`) as `IUSA` is delisted/ambiguous.

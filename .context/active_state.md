@@ -1,16 +1,13 @@
 # 🔴 Active Session State
-**Objective:** Phase 7: Optimization & Polish
-**Status:** Pending
+**Objective:** Maintenance
+**Status:** Stable
 
 ## 🛡️ Applied Constraints
-- [Constraint: Performance] - Dashboard must load < 2s.
-- [Constraint: User Experience] - Interactive prompts should be minimized for standard runs.
+- [Constraint: Stability] - No new features without a formal plan.
 
 ## 📝 Plan & Progress
-- [ ] 1. **Backlog Attack:** Implement the "Vanguard" adapter (requested in Backlog).
-- [ ] 2. **Dashboard Polish:** Add better filtering and "Look-Through" exposure (e.g., "Show me all ETFs with >5% Nvidia").
-- [ ] 3. **Performance:** Profile the aggregation step for large portfolios.
+- [x] 1. **Validation Run:** Completed successfully.
+- [ ] 2. **Next Steps:** User to run `./run_dashboard.sh` to explore the data.
 
 ## 🧠 Context & Learnings
-*   **Reliability Win:** The iShares automation proved that "smart scraping" is a viable alternative to official APIs when data is public but hidden.
-*   **Metric Visibility:** The "Data Funnel" metric is the single best indicator of pipeline health.
+*   **Interactive workflows work:** The "Human-in-the-Loop" design for resolving unknown tickers and providers is highly effective and prevents the "garbage in, garbage out" problem.

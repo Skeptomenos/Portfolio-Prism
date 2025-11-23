@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Verified
+- **User Validation**: Successfully executed a full end-to-end run with live user data. Confirmed that:
+  - Interactive Ticker Mapping correctly prompts for missing prices (`FR0010361683` -> `LYMD.DE`).
+  - Registry Update correctly identifies new assets (`THYSSENKRUPP`).
+  - iShares Automation works without user intervention.
+  - Log noise from non-equity assets is suppressed.
+
 ### Added
 - **iShares Automation**: Implemented `_discover_product_id` in `ISharesAdapter`. It now scrapes the iShares website to automatically find the required `product_id` for new ETFs, removing the need for manual user input and closing the data gap for assets like `DE000A0F5UF5`.
 - **Noise Filtering**: Updated `enrich_securities_bulk` to skip identifiers starting with `_` or containing `NON_EQUITY`. This significantly reduces API calls and eliminates 404 errors for internal cash/currency placeholders.
