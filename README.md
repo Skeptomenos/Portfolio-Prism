@@ -71,8 +71,8 @@ cd portfolio-master/POC
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package in editable mode
+pip install -e .
 ```
 
 ### 3. Prepare Your Data

@@ -1,0 +1,14 @@
+pandas
+selenium
+selenium-wire
+webdriver-manager
+yfinance
+python-dotenv
+requests
+pdfplumber
+deep-translator
+tqdm
+python-calamine
+openpyxl
+pytest
+pandera

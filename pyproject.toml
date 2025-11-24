@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio_poc"
+version = "0.1.0"
+description = "Portfolio True Exposure POC"
+authors = [{name = "David Helmus", email = "david@example.com"}]
+requires-python = ">=3.9"
+dependencies = [
+    "pandas",
+    "selenium",
+    "selenium-wire",
+    "webdriver-manager",
+    "yfinance",
+    "python-dotenv",
+    "requests",
+    "pdfplumber",
+    "deep-translator",
+    "tqdm",
+    "python-calamine",
+    "openpyxl",
+    "pytest",
+    "pandera"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

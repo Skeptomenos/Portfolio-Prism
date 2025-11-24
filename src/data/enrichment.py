@@ -5,16 +5,14 @@ import time
 import yfinance as yf
 from dotenv import load_dotenv
 
-# Add project root to path to allow absolute imports
-import sys
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+
 
 from src.data.caching import load_from_cache, save_to_cache, get_cache_key
 
 # Load environment variables from .env file
 load_dotenv()
+
+from typing import List, Dict, Optional, Any
 
 # --- Constants ---
 FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
@@ -22,7 +20,7 @@ FINNHUB_API_URL = 'https://finnhub.io/api/v1'
 
 # --- Helper Functions ---
 
-def fetch_from_yfinance(identifier):
+def fetch_from_yfinance(identifier: str) -> Optional[Dict[str, str]]:
     """
     Attempts to fetch metadata from YFinance using the identifier (ISIN or Ticker).
     Returns a dictionary with 'sector', 'geography', and 'name' or None if failed.
@@ -41,7 +39,10 @@ def fetch_from_yfinance(identifier):
         pass
     return None
 
-def enrich_securities_bulk(securities_to_fetch, force_refresh=False):
+def enrich_securities_bulk(
+    securities_to_fetch: List[Dict[str, Any]], 
+    force_refresh: bool = False
+) -> List[Dict[str, Any]]:
     """
     Enriches a list of securities with metadata from Finnhub, using a robust caching layer.
     
@@ -133,7 +134,10 @@ def enrich_securities_bulk(securities_to_fetch, force_refresh=False):
 
 # --- Main Function ---
 
-def enrich_securities(securities, force_refresh=False):
+def enrich_securities(
+    securities: List[Dict[str, Any]], 
+    force_refresh: bool = False
+) -> List[Dict[str, Any]]:
     """
     Enriches a list of securities with metadata by calling the bulk enrichment function.
     The caching logic is now handled within the bulk function itself.

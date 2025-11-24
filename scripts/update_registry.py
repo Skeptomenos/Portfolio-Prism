@@ -1,19 +1,13 @@
 import json
 import os
-import sys
 import pandas as pd
 from pathlib import Path
-
-# Project Root Setup
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-REGISTRY_PATH = os.path.join(project_root, 'config', 'adapter_registry.json')
+REGISTRY_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config', 'adapter_registry.json'))
 
 # Map CLI options to Adapter Keys (and keywords for validation)
 PROVIDER_OPTIONS = {

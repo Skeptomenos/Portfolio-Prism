@@ -3,14 +3,10 @@ from unittest.mock import patch
 import pandas as pd
 import os
 
-# Add the project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-import sys
-sys.path.insert(0, project_root)
 
-from holdings_engine.adapters.vaneck import VanEckAdapter
-from holdings_engine.adapters.ishares import ISharesAdapter
-from holdings_engine.adapters.xtrackers import XtrackersAdapter
+from src.adapters.vaneck import VanEckAdapter
+from src.adapters.ishares import ISharesAdapter
+from src.adapters.xtrackers import XtrackersAdapter
 
 class TestAdapters(unittest.TestCase):
 

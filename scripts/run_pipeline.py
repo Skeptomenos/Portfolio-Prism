@@ -7,10 +7,7 @@ from dotenv import load_dotenv, find_dotenv
 # Load environment variables from .env file
 load_dotenv(find_dotenv())
 
-# Add the project root to the Python path to allow for absolute imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+
 
 from src.data.state_manager import load_portfolio_state
 from src.core.aggregation import run_aggregation

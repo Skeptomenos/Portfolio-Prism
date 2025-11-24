@@ -1,5 +1,19 @@
 # Changelog
 
+## [Phase 10] - 2025-11-24
+
+### Added
+- **Packaging**: Introduced `pyproject.toml` to make the project an installable Python package.
+- **Configuration**: Created `src/config.py` to centralize all file paths and remove hardcoded strings.
+- **Type Safety**: Added comprehensive type hints to `src/core/aggregation.py` and `src/data/enrichment.py`.
+
+### Changed
+- **Refactoring**: Split the monolithic `AmundiAdapter.fetch_holdings` method into modular components (`_fetch_from_manual_file`, `_fetch_via_selenium`, `_parse_downloaded_file`).
+- **Standardization**: Removed all `sys.path.insert(...)` hacks from the codebase.
+- **Cleanup**: Deleted legacy files (`legacy_pipeline.py`, `legacy_prices.py`) and tests.
+
+---
+
 ## [Phase 9] - 2025-11-24
 
 ### Added

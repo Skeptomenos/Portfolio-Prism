@@ -4,12 +4,9 @@ from pandas.testing import assert_frame_equal
 import sys
 import os
 
-# Add the project root to the Python path to allow for absolute imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
-from phases.active.aggregation import run_aggregation
+
+from src.core.aggregation import run_aggregation
 
 from unittest import mock
 

@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: portfolio_poc
+Version: 0.1.0
+Summary: Portfolio True Exposure POC
+Author-email: David Helmus <david@example.com>
+Requires-Python: >=3.9
+Requires-Dist: pandas
+Requires-Dist: selenium
+Requires-Dist: selenium-wire
+Requires-Dist: webdriver-manager
+Requires-Dist: yfinance
+Requires-Dist: python-dotenv
+Requires-Dist: requests
+Requires-Dist: pdfplumber
+Requires-Dist: deep-translator
+Requires-Dist: tqdm
+Requires-Dist: python-calamine
+Requires-Dist: openpyxl
+Requires-Dist: pytest
+Requires-Dist: pandera

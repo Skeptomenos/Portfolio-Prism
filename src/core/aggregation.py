@@ -3,11 +3,10 @@ import pandas as pd
 import sys
 import os
 
-# Add the project root to the Python path to allow for absolute imports
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
+
+from typing import Dict, List, Any, Optional
+from src.config import TRUE_EXPOSURE_REPORT
 from src.data.manager import load_positions_from_db
 from src.data.enrichment import enrich_securities
 from src.utils.classification import classify_holding
@@ -16,12 +15,16 @@ from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
+def run_aggregation(
+    direct_positions: pd.DataFrame, 
+    etf_positions: pd.DataFrame, 
+    etf_holdings_map: Dict[str, pd.DataFrame]
+) -> pd.DataFrame:
     """
     Main function to run the entire exposure aggregation process.
     Accepts DataFrames and a dictionary of holdings to decouple logic from I/O.
     """
-    output_filepath = 'outputs/true_exposure_report.csv'
+    output_filepath = TRUE_EXPOSURE_REPORT
 
     if direct_positions.empty and etf_positions.empty:
         logger.warning("No positions found. Exiting aggregation.")

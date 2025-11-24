@@ -56,6 +56,9 @@
 - **Slow PDF Parsing:** 10mins -> **Multiprocessing**: Pool per page + **Incremental**: Skip known file hashes (SQLite).
 - **Yahoo Tickers:** `NESN` (No) vs `NESN.SW` (Yes) -> **Suffix Logic**: Add exchange suffix based on ISIN/Region.
 - **Config Drift:** Manual registry updates -> **CLI**: Interactive `update_registry.py` prompts user.
+- **Import Hell:** `sys.path` hacks brittle -> **Packaging**: `pyproject.toml` + `pip install -e .`.
+- **Path Sprawl:** Hardcoded strings (`data/inputs`) -> **Central Config**: `src/config.py`.
+- **Refactoring:** Monoliths (Amundi) -> **Split**: `_fetch_manual` (Logic) vs `_fetch_selenium` (IO).
 
 ### 3.4. Data Modeling
 - **Ghost Assets:** Stale state -> **Clean Slate**: Wipe DB before run. State > Events.

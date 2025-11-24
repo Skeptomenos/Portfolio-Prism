@@ -4,7 +4,7 @@ import pandas as pd
 import pandera as pa
 from src.utils.schemas import HoldingsSchema
 
-def test_holdings_schema_valid():
+import unittest
 
 class TestValidation(unittest.TestCase):
 

@@ -52,3 +52,18 @@ We transitioned to a **State-Based / Relational Architecture**:
 *   **Maintainability:** The `asset_universe.csv` can be curated and shared (e.g., open-sourced) without exposing user holdings.
 *   **Accuracy:** Ticker/ISIN mapping is explicit and verified, eliminating lookup failures.
 *   **Trade-off:** The automated PDF parser is temporarily disconnected from the main pipeline (it writes to the old DB). A future refactor is needed to make the parser update the CSVs instead.
+
+## 2025-11-24: Codebase Modernization (Packaging & Config)
+
+### Context
+The codebase suffered from "Script Rot": brittle `sys.path` hacks, hardcoded paths scattered across files, and monolithic functions that were hard to test. This made the project fragile and difficult to install or extend.
+
+### Decision
+1.  **Packaging First:** We converted the project into a standard Python package using `pyproject.toml`.
+2.  **Centralized Config:** We moved all filesystem paths to `src/config.py`.
+3.  **Modular Refactoring:** We broke down the largest "God Method" (`AmundiAdapter`) into testable units.
+
+### Consequences
+*   **Robustness:** Tests can now run reliably without path hacks.
+*   **Maintainability:** Changing a data directory now requires editing 1 line in `config.py` instead of 10 files.
+*   **Quality:** Type hints and smaller functions enable better static analysis and testing.
