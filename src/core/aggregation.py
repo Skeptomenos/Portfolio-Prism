@@ -110,7 +110,17 @@ def run_aggregation(direct_positions, etf_positions, etf_holdings_map):
             
             # Calculate indirect value
             etf_holdings['indirect'] = etf_holdings['weight_percentage'] / 100 * etf_market_value
+            
+            # DEBUG: Trace Large Holdings
+            huge = etf_holdings[etf_holdings['indirect'] > 1000]
+            if not huge.empty:
+                 logger.info(f"🔎 FOUND LARGE HOLDING in ETF {etf_isin} ({etf['name']}):")
+                 logger.info(huge[['name', 'weight_percentage', 'indirect']].to_string())
+            
             all_holdings = pd.concat([all_holdings, etf_holdings])
+
+    # DEBUG: Save intermediate holdings
+    all_holdings.to_csv('outputs/debug_all_holdings.csv', index=False)
 
     if not all_holdings.empty:
         # We need to preserve asset_class info for reporting

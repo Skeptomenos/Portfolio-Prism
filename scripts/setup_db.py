@@ -72,11 +72,16 @@ def run_live_population():
     
     positions_df = calculate_positions(parsed_df)
     
+    # Normalize Asset Names (ISIN Lookup)
+    print("2a. Normalizing asset names...")
+    from src.data.normalization import normalize_asset_names
+    positions_df = normalize_asset_names(positions_df)
+    
     # Step 3: Classify assets as Stock or ETF
     print("3. Classifying assets...")
     with open(CONFIG_PATH, 'r') as f:
         adapter_registry = json.load(f)
-    etf_isins = adapter_registry.keys()
+    etf_isins = {k for k, v in adapter_registry.items() if v != "ignore"}
     positions_df['asset_type'] = positions_df['ISIN'].apply(lambda x: 'ETF' if x in etf_isins else 'Stock')
     
     # Step 4: Save to database

@@ -44,6 +44,10 @@ data/working/raw_downloads/*
 data/working/temp/*
 !data/working/temp/.gitkeep
 
+# Ignore sensitive user portfolio data (images, holdings)
+data/true_data/*
+!data/true_data/.gitkeep
+
 # Project Outputs
 outputs/*
 !outputs/.gitkeep

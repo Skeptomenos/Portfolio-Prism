@@ -12,7 +12,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data.manager import load_positions_from_db
+from src.data.state_manager import load_portfolio_state
 from src.core.aggregation import run_aggregation
 from src.core.reporting import generate_report
 from src.data.market import get_price_map
@@ -20,6 +20,7 @@ from src.core.validation import validate_final_report
 from src.utils.logging_config import get_logger
 from src.adapters.registry import AdapterRegistry, AdapterNotImplementedError
 from src.utils.schemas import HoldingsSchema
+from src.core.direct_reporting import generate_direct_holdings_report
 import pandera as pa
 from datetime import datetime
 from scripts.update_registry import update_registry_interactive
@@ -51,68 +52,28 @@ def run_pipeline():
     logger.info("--- Starting True Exposure Pipeline ---")
 
     # --- Phase 1 & 2 (Data Loading) ---
-    direct_positions, etf_positions = load_positions_from_db()
+    # Use State Manager (Prioritizes Truth CSV)
+    direct_positions, etf_positions = load_portfolio_state()
+    
+    # Ensure columns exist for market data updates
+    if 'current_price' not in direct_positions.columns:
+        direct_positions['current_price'] = None
+    if 'market_value' not in direct_positions.columns:
+        direct_positions['market_value'] = 0.0
+        
+    if 'current_price' not in etf_positions.columns:
+        etf_positions['current_price'] = None
+    if 'market_value' not in etf_positions.columns:
+        etf_positions['market_value'] = 0.0
     
     tracker.set_funnel_metric("total_positions_db", len(direct_positions) + len(etf_positions))
     tracker.set_funnel_metric("direct_holdings", len(direct_positions))
     tracker.set_funnel_metric("etf_positions", len(etf_positions))
 
     if direct_positions.empty and etf_positions.empty:
-        logger.warning("--- Pipeline Halted: No positions found in the database. ---")
+        logger.warning("--- Pipeline Halted: No positions found in the portfolio state. ---")
         tracker.save("outputs/pipeline_metrics.json")
         return
-
-    # --- Phase 2.1: Registry Update (Human-in-the-Loop) ---
-    # Combine positions to scan for new assets. We rename columns to match what update_registry expects (ISIN, NAME)
-    # The DB load returns lowercase columns 'isin', 'name'
-    all_positions_scan = pd.concat([direct_positions, etf_positions])
-    all_positions_scan = all_positions_scan.rename(columns={'isin': 'ISIN', 'name': 'NAME'})
-    
-    # Only run interactive update if we are in a TTY (terminal)
-    if sys.stdout.isatty():
-        update_registry_interactive(all_positions_scan)
-    else:
-        logger.info("Non-interactive mode detected. Skipping registry update prompt.")
-
-    # --- RE-SYNC DB with Registry ---
-    # The positions table might still have 'Stock' as asset_type if they were loaded before mapping.
-    # We must update the asset_type in the DB based on the new registry.
-    import sqlite3
-    import json
-    
-    registry_path = os.path.join(project_root, 'config', 'adapter_registry.json')
-    db_path = os.path.join(project_root, 'data', 'working', 'database', 'portfolio.db')
-    
-    if os.path.exists(registry_path) and os.path.exists(db_path):
-        try:
-            with open(registry_path, 'r') as f:
-                registry_data = json.load(f)
-            
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            
-            updated_count = 0
-            for isin, provider in registry_data.items():
-                if provider and provider != "ignore":
-                    cursor.execute("UPDATE positions SET asset_type = 'ETF' WHERE ISIN = ?", (isin,))
-                    updated_count += cursor.rowcount
-            
-            conn.commit()
-            conn.close()
-            logger.info(f"--- Synced DB with Registry: Updated {updated_count} positions to 'ETF' ---")
-        except Exception as e:
-            logger.error(f"Failed to sync DB with registry: {e}")
-
-    # --- RE-LOAD Data (Critical) ---
-    # We must reload positions because the classification (ETF vs Stock) depends on the
-    # now-updated adapter_registry.json.
-    logger.info("--- Reloading positions with updated registry... ---")
-    direct_positions, etf_positions = load_positions_from_db()
-    
-    # Update funnel metrics again after reload/re-sync
-    tracker.set_funnel_metric("total_positions_db", len(direct_positions) + len(etf_positions))
-    tracker.set_funnel_metric("direct_holdings", len(direct_positions))
-    tracker.set_funnel_metric("etf_positions", len(etf_positions))
 
     # --- Setup Adapter Registry (after potential updates) ---
     adapter_registry = AdapterRegistry()
@@ -139,6 +100,9 @@ def run_pipeline():
                 price_val = row['current_price']
                 price_str = f"€{price_val:.2f}" if price_val is not None else "N/A"
                 logger.warning(f"  - ⚠️ No live price for {isin}. Using database value: {price_str}")
+
+    # --- Phase 2.6 (Direct Reporting) ---
+    generate_direct_holdings_report(all_positions)
 
     # Re-split for processing
     direct_positions = all_positions[all_positions['asset_type'] != 'ETF'].copy()

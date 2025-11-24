@@ -14,17 +14,22 @@ st.set_page_config(
 # Constants
 OUTPUT_DIR = "outputs"
 CSV_PATH = os.path.join(OUTPUT_DIR, "true_exposure_report.csv")
+DIRECT_CSV_PATH = os.path.join(OUTPUT_DIR, "direct_holdings_report.csv")
 METRICS_PATH = os.path.join(OUTPUT_DIR, "pipeline_metrics.json")
 QUALITY_PATH = os.path.join(OUTPUT_DIR, "data_quality_report.txt")
 
 def load_data():
     """Loads the latest available data."""
     df = None
+    direct_df = None
     metrics = None
     quality_text = ""
 
     if os.path.exists(CSV_PATH):
         df = pd.read_csv(CSV_PATH)
+        
+    if os.path.exists(DIRECT_CSV_PATH):
+        direct_df = pd.read_csv(DIRECT_CSV_PATH)
     
     if os.path.exists(METRICS_PATH):
         with open(METRICS_PATH, 'r') as f:
@@ -34,9 +39,9 @@ def load_data():
         with open(QUALITY_PATH, 'r') as f:
             quality_text = f.read()
 
-    return df, metrics, quality_text
+    return df, direct_df, metrics, quality_text
 
-df, metrics, quality_text = load_data()
+df, direct_df, metrics, quality_text = load_data()
 
 st.title("📊 Portfolio True Exposure Dashboard")
 
@@ -45,27 +50,27 @@ if df is None:
     st.stop()
 
 # Tabs
-tab1, tab2 = st.tabs(["💰 Portfolio X-Ray", "🛠️ Pipeline Health"])
+tab1, tab2, tab3 = st.tabs(["💰 Portfolio X-Ray", "🔍 Direct Holdings Audit", "🛠️ Pipeline Health"])
 
 with tab1:
     st.header("Financial Exposure")
     
     # KPIs
-    total_value = df['value_eur'].sum()
-    st.metric("Total Portfolio Value", f"€{total_value:,.2f}")
+    total_value = df['total_exposure'].sum()
+    st.metric("Total Portfolio Value (Indirect)", f"€{total_value:,.2f}")
 
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("Top 10 Holdings")
-        top_10 = df.nlargest(10, 'value_eur')
+        top_10 = df.nlargest(10, 'total_exposure')
         fig_bar = px.bar(
             top_10, 
-            x='value_eur', 
+            x='total_exposure', 
             y='name', 
             orientation='h',
             title="Top 10 Underlying Assets (Direct + Indirect)",
-            labels={'value_eur': 'Value (€)', 'name': 'Asset'},
+            labels={'total_exposure': 'Value (€)', 'name': 'Asset'},
             text_auto='.2s'
         )
         fig_bar.update_layout(yaxis={'categoryorder':'total ascending'})
@@ -76,13 +81,13 @@ with tab1:
         # Create a hierarchy for the sunburst
         # Ideally we'd have Sector/Region, but for now we use asset_type -> name
         # If we had sector data in the CSV, we'd use it here.
-        # Let's check columns: 'isin', 'name', 'value_eur', 'weight_pct', 'asset_type' (maybe?)
-        # The aggregation output usually has: isin, name, value_eur, weight_in_portfolio
+        # Let's check columns: 'isin', 'name', 'total_exposure', 'weight_pct', 'asset_type' (maybe?)
+        # The aggregation output usually has: isin, name, total_exposure, weight_in_portfolio
         
         # We'll use a simple Pie chart for now if hierarchy is missing
         fig_pie = px.pie(
             df.head(20), # Top 20 for readability
-            values='value_eur', 
+            values='total_exposure', 
             names='name',
             title="Top 20 Assets Allocation"
         )
@@ -92,12 +97,28 @@ with tab1:
     search_term = st.text_input("Search for an asset (e.g. 'Nvidia', 'Apple')", "")
     if search_term:
         filtered_df = df[df['name'].str.contains(search_term, case=False, na=False)]
-        st.dataframe(filtered_df.sort_values(by='value_eur', ascending=False))
+        st.dataframe(filtered_df.sort_values(by='total_exposure', ascending=False))
     else:
-        st.dataframe(df.sort_values(by='value_eur', ascending=False).head(50))
-
+        st.dataframe(df.sort_values(by='total_exposure', ascending=False).head(50))
 
 with tab2:
+    st.header("Direct Holdings Audit")
+    if direct_df is not None:
+        total_direct = direct_df['market_value'].sum()
+        st.metric("Total Portfolio Value (Direct)", f"€{total_direct:,.2f}")
+        
+        st.dataframe(
+            direct_df.style.format({
+                "market_value": "€{:.2f}",
+                "current_price": "€{:.2f}",
+                "portfolio_weight": "{:.2%}"
+            }),
+            use_container_width=True
+        )
+    else:
+        st.warning("No Direct Holdings report found.")
+
+with tab3:
     st.header("Pipeline Operations & Health")
     
     if metrics:

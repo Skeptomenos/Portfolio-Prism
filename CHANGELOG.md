@@ -1,27 +1,29 @@
 # Changelog
 
-## [Unreleased]
-
-### Verified
-- **User Validation**: Successfully executed a full end-to-end run with live user data. Confirmed that:
-  - Interactive Ticker Mapping correctly prompts for missing prices (`FR0010361683` -> `LYMD.DE`).
-  - Registry Update correctly identifies new assets (`THYSSENKRUPP`).
-  - iShares Automation works without user intervention.
-  - Log noise from non-equity assets is suppressed.
+## [Phase 9] - 2025-11-24
 
 ### Added
-- **iShares Automation**: Implemented `_discover_product_id` in `ISharesAdapter`. It now scrapes the iShares website to automatically find the required `product_id` for new ETFs, removing the need for manual user input and closing the data gap for assets like `DE000A0F5UF5`.
-- **Noise Filtering**: Updated `enrich_securities_bulk` to skip identifiers starting with `_` or containing `NON_EQUITY`. This significantly reduces API calls and eliminates 404 errors for internal cash/currency placeholders.
-
-### Changed
-- **Configuration**: Removed invalid test case (`DE0007500001` -> `vanguard`) from `adapter_registry.json`, resolving false positive "Provider not supported" warnings.
-- **Market Data**: Verified and documented the interactive `resolve_ticker` flow for direct holdings.
+- **Architecture**: Implemented a **Hybrid Relational Architecture**. Introduced `asset_universe.csv` (Metadata) and `portfolio_holdings.csv` (State) to decouple asset definition from ownership.
+- **Auditability**: Created a "Direct Holdings Report" (Level 1 Audit) and visualized it in a new Dashboard tab. This allows users to verify input data before complex aggregation.
+- **Market Data**: Implemented **Batch Price Fetching** with escalation (`1d` -> `5d` -> `1mo`). This resolved widespread "Delisted" errors caused by weekend/holiday execution.
+- **Identity Resolution**: Implemented an **Auto-Suffix** strategy for Yahoo Tickers (trying `.DE`, `.F` automatically), drastically reducing manual user prompts.
+- **iShares Automation**: Implemented `_discover_product_id` in `ISharesAdapter` to scrape product IDs automatically, closing data gaps.
+- **Noise Filtering**: Updated enrichment to skip internal identifiers, reducing API noise.
 
 ### Fixed
-- **Enrichment Failure (Europe)**: Fixed widespread 404 errors in `yfinance` enrichment for European assets.
-  - **Root Cause**: iShares adapter was extracting raw tickers (e.g., `RR.`, `NESN`) which Yahoo rejects.
-  - **Solution**: `ISharesAdapter` now captures exchange metadata (`Standort`, `Börse`) and intelligently generates Yahoo-compatible suffixes (e.g., `RR.L`, `NESN.SW`, `0388.HK`).
-- **Data Quality**: `aggregation.py` now explicitly filters out garbage rows (e.g., `_CURRENCYUSD`, `NaN` tickers) before they reach the enrichment layer, cleaning up reports.
+- **AstraZeneca Ghost**: Eliminated the massive phantom holding (50% portfolio weight) by moving to a Clean Slate + Relational Model, enforcing strict referential integrity.
+- **Scaling Bug**: Fixed a Look-Through Scaling error (100x inflation of Nvidia) by ensuring percentage weights are correctly normalized in the aggregation logic.
+- **Ticker/ISIN Conflict**: Resolved the conflict between Pricing (needs Ticker) and Holdings (needs ISIN) by using the Relational Model as a bridge.
+- **Enrichment Failure (Europe)**: Fixed widespread 404 errors in `yfinance` by generating Yahoo-compatible suffixes (e.g., `NESN.SW`).
+- **Price Valuation Bug**: Fixed a corrupted `ticker_map.json` that caused 10x overvaluation.
+- **Critical Value Error**: Fixed a parsing bug where English fractional shares were misinterpreted as German thousands.
+
+### Changed
+- **Configuration**: Removed invalid test cases from `adapter_registry.json`.
+- **Market Data**: Verified and documented the interactive `resolve_ticker` flow.
+
+### Deprecated
+- **Legacy Modules**: `src/data/manager.py` (Old DB Loader) is now obsolete. `scripts/setup_db.py` writes to a SQLite DB that is no longer used by the main pipeline.
 
 ---
 

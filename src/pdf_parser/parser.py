@@ -209,10 +209,10 @@ def process_single_page(args):
             # Translate content
             if "TYPE" in page_df.columns:
                 page_df["TYPE"] = page_df["TYPE"].map(lambda x: TYPE_MAPPING.get(x, x))
-            if "DESCRIPTION" in page_df.columns:
-                page_df["DESCRIPTION"] = page_df["DESCRIPTION"].apply(
-                    translate_to_english
-                )
+            # if "DESCRIPTION" in page_df.columns:
+            #     page_df["DESCRIPTION"] = page_df["DESCRIPTION"].apply(
+            #         translate_to_english
+            #     )
 
             # Process Transactions
             transactions_df = page_df.copy()

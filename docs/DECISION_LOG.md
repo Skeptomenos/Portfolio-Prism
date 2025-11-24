@@ -33,3 +33,22 @@ We integrated `python-calamine` (a Python binding for the Rust `calamine` librar
 *   **Robustness:** The system can now read corrupted/non-compliant Excel files that `pandas`/`openpyxl` reject.
 *   **Dependencies:** Added `python-calamine` to `requirements.txt`.
 *   **UX:** Users can simply download files (even if broken) and the system handles them transparently.
+
+## 2025-11-24: Shift to Relational Snapshot Architecture (Hybrid Model)
+
+### Context
+The initial "PDF Replay" architecture was fragile. A single missing historical transaction (e.g., from an old PDF not included in the export) resulted in incorrect current quantities. Furthermore, data quality issues (phantom holdings like AstraZeneca) were hard to debug because the state was derived dynamically rather than stored explicitly. Finally, we faced a "Ticker vs. ISIN" conflict where pricing APIs needed Tickers but Holdings APIs needed ISINs.
+
+### Decision
+We transitioned to a **State-Based / Relational Architecture**:
+1.  **Snapshot Source:** We prioritize a validated "Snapshot" of current holdings (`portfolio_holdings.csv`) over replaying transaction history.
+2.  **Relational Data:** We split asset definition from ownership.
+    *   **`asset_universe.csv`:** The Master Record. Contains `ISIN`, `Name`, `Yahoo_Ticker`, `Provider`. Solves the identity crisis.
+    *   **`portfolio_holdings.csv`:** The State. Contains `ISIN` and `Quantity`.
+3.  **Batch Pricing:** We replaced single-ticker fetching with robust batch fetching (`period='5d'`) to handle market closures and prevent false "Delisted" errors.
+
+### Consequences
+*   **Robustness:** The system is now resilient to missing history. "What you see is what you analyze."
+*   **Maintainability:** The `asset_universe.csv` can be curated and shared (e.g., open-sourced) without exposing user holdings.
+*   **Accuracy:** Ticker/ISIN mapping is explicit and verified, eliminating lookup failures.
+*   **Trade-off:** The automated PDF parser is temporarily disconnected from the main pipeline (it writes to the old DB). A future refactor is needed to make the parser update the CSVs instead.

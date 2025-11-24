@@ -9,7 +9,7 @@
   "IE00B53SZB19": "ishares",
   "IE00B5BMR087": "ishares",
   "IE00BL25JP72": "xtrackers",
-  "IE00BYVQ9F29": "ignore",
+  "IE00BYVQ9F29": "ishares",
   "KYG9830T1067": "ignore",
   "LU0908500753": "amundi",
   "US0079031078": "ignore",
@@ -18,5 +18,6 @@
   "US67066G1040": "ignore",
   "US69608A1088": "ignore",
   "US88160R1014": "ignore",
-  "DE0007500001": "ignore"
+  "DE0007500001": "ignore",
+  "DE000A161408": "ignore"
 }

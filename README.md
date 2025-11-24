@@ -130,9 +130,12 @@ data/
 │   ├── portfolio/          # Your PDFs go here
 │   └── manual_holdings/    # Manual Amundi files go here
 └── working/                # System DB and caches (Do not touch)
+scripts/                    # Entry points (run_pipeline.py, setup_db.py)
 src/
 ├── adapters/               # ETF Provider logic
 ├── core/                   # Aggregation & Reporting logic
-└── pdf_parser/             # Trade Republic parser
+├── data/                   # I/O & Enrichment (enrichment.py)
+├── pdf_parser/             # Trade Republic parser
+└── utils/                  # Shared utilities
 outputs/                    # Your final reports
 ```

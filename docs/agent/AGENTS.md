@@ -4,28 +4,24 @@ This document provides instructions for AI agents operating in this repository.
 
 ## Task Lifecycle & Learning Protocol (Phase 0) - CRITICAL
 
-This protocol is the highest priority and governs the entire lifecycle of every task.
-
-**1. Initialization:**
-- On any new task, create a temporary log file (e.g., `.llm/logs/TASK_ID.md`).
-- In the log, state the `Objective`, `Initial Plan`, and any `Assumptions`.
-- **Crucially, you must read the permanent `.llm/project_learnings.md` file to inform your plan.**
+**1. Initialization (Context Loading):**
+- **Read `.context/active_state.md`**.
+- **Read `.context/handover.md`**.
+- **Read `docs/PROJECT_LEARNINGS.md`**.
+- Compare the user's prompt with the active state.
+    - If continuing: **RESUME** and update the state.
+    - If new: **ARCHIVE** the old state and **RESET**.
 
 **2. Execution Loop:**
-- Before every action, review the `Key Learnings & Constraints` in your current task log.
-- After every action, log the command, its outcome, and key observations.
-- If an action fails or an assumption is proven wrong, add a new, concise rule to the `Key Learnings & Constraints` section of your task log.
-- **0.2.1: The OODA Loop for Debugging:** When an action fails (especially in web scraping), you MUST follow a strict OODA loop.
-    - **Observe:** Your first and only action after a failure is to gather evidence. For scraping, this means saving a screenshot and the full page source. You must then analyze this evidence.
-    - **Orient:** In your thought process, you must explicitly state your new orientation based *only* on the evidence from the screenshot/HTML. State what you saw and why your previous assumption was wrong.
-    - **Decide:** Formulate a *new, single, testable hypothesis*. (e.g., "My new hypothesis is that the correct selector is `...`").
-    - **Act:** Implement *only* the change required to test that single hypothesis. Do not add other changes.
+- Update `.context/active_state.md` at the end of every logical block.
+- Use the OODA Loop (Observe-Orient-Decide-Act) for debugging.
+- **DO NOT** use ephemeral log files anymore. Use the persistent state.
 
-**3. Finalization & Learning Persistence:**
-- On task completion, review the learnings from your temporary log.
-- Append any new, project-specific learnings to the permanent `.llm/project_learnings.md` file.
-- Use the `save_memory` tool for any new global learnings.
-- Delete the temporary log file.
+**3. Finalization:**
+- Update `CHANGELOG.md` and `docs/DECISION_LOG.md`.
+- Update `docs/PROJECT_LEARNINGS.md` with new wisdom.
+- Move `.context/active_state.md` to `.context/history/`.
+- Create `.context/handover.md` for the next agent.
 
 ## Core Principles
 
@@ -36,7 +32,7 @@ This protocol is the highest priority and governs the entire lifecycle of every 
 
 -   **Environment:** Use the existing `venv`. Activate with `source venv/bin/activate`.
 -   **Dependencies:** Install with `pip install -r requirements.txt`. A `requirements.txt` should be created with `pandas` and `pdfplumber`.
--   **Execution:** The main script is `poc.py`.
+-   **Execution:** The main script is `main.py`.
 
 ## Debugging Methodology
 
@@ -45,6 +41,17 @@ This protocol is the highest priority and governs the entire lifecycle of every 
     2.  Distill those down to the 1-2 most likely sources.
     3.  Add temporary logging or debug prints to the code to validate your assumptions about the likely source.
     4.  Only after validating the root cause, proceed with implementing the actual code fix.
+
+### **OODA Loop for Systematic Debugging (CRITICAL)**
+
+When an action fails (especially in web scraping or complex integrations), you **MUST** follow a strict OODA loop to avoid inefficient trial-and-error debugging:
+
+- **Observe:** Your first and only action after a failure is to gather evidence. For scraping, this means saving a screenshot and the full page source. You must then analyze this evidence without making assumptions.
+- **Orient:** In your thought process, you must explicitly state your new orientation based *only* on the evidence from the screenshot/HTML. State what you saw and why your previous assumption was wrong.
+- **Decide:** Formulate a *new, single, testable hypothesis*. (e.g., "My new hypothesis is that the correct selector is `...`").
+- **Act:** Implement *only* the change required to test that single hypothesis. Do not add other changes or fixes.
+
+**Why this matters:** This prevents the common mistake of making multiple changes simultaneously, making it impossible to know which change fixed the issue. Each OODA cycle tests exactly one hypothesis.
 
 ## Linting & Formatting
 
@@ -57,19 +64,21 @@ This protocol is the highest priority and governs the entire lifecycle of every 
 -   **Run all tests:** `pytest`
 -   **Run a single test:** `pytest path/to/test_file.py::test_function_name`
 
-## Code Style Guidelines
+## Code Style & Standards
 
--   **Imports:** Use `isort` conventions (via `ruff`): sorted alphabetically, grouped by standard library, third-party, and local modules.
--   **Formatting:** Adhere to PEP 8, enforced by `ruff format`.
--   **Types:** Use type hints for all function signatures.
--   **Naming:** Use `snake_case` for variables and functions, `PascalCase` for classes.
--   **Error Handling:** Use `try...except` blocks for file I/O and API calls. Raise specific exceptions where appropriate.
+**CRITICAL:** All code must adhere strictly to the rules defined in **`docs/agent/CODING_STANDARDS.md`**.
+This includes:
+- **Formatting:** PEP 8, Imports, Variables.
+- **Typing:** Mandatory Type Hints.
+- **Comments:** Standard English docstrings (No "telegraphic" style in code).
+- **Security:** Zero Trust for secrets and inputs.
+- **Logging:** Centralized logging (No `print()`).
 
 ## Project Structure
 
 This project follows a structured layout. Adhere to this structure for all file operations.
 
--   `phases/`: Contains phase-specific code (completed/ for Phases 1-2, active/ for current Phase 3, shared/ for utilities).
+-   `src/`: Contains source code organized by functionality (adapters/, core/, data/, etc.).
 -   `data/`: Contains input data (inputs/ for PDFs, database files).
 -   `outputs/`: For all generated output files.
 -   `debug/`: Contains debugging scripts and screenshots.
@@ -109,14 +118,51 @@ This project contains custom agents to assist with development.
 
 ## Mandatory AI Coding Directives
 
-All AI agents must adhere strictly to the rules in `docs/AI_CODING_DIRECTIVES.md`. These directives are paramount for the project and must be followed in all tasks:
+All AI agents must adhere strictly to the rules defined in `docs/agent/AI_CODING_DIRECTIVES.md`. These directives are paramount for the project's success and must be integrated into every phase of your work.
 
-- **Phase 1: Design & Architect**: Decompose requests, analyze context, design data schemas and API contracts, prefer asynchronous patterns, design for scalability.
-- **Phase 2: Build & Implement**: Search for reusable components, separate concerns, write small functions, analyze performance, add observability.
-- **Phase 3: Verify & Secure**: Write comprehensive tests, handle all errors, sanitize inputs, mock externals, pass CI gates.
-- **Phase 4: Deliver & Document**: Update documentation, manage DB changes with migrations, ensure backward compatibility, use feature flags.
+**Enforcement and Implementation for AI Agents:**
 
-Before any output or code change, checklist compliance: [ ] Decomposed? [ ] Designed? [ ] Tested? [ ] Documented? Revise if not met. Violations require justification and docs-validation review.
+Before initiating any significant action (e.g., proposing a plan, writing code, making file modifications), you **MUST** internally review your intended actions against the relevant directives. This is a continuous, iterative process.
+
+### **Phase 1: Design & Architect (CRITICAL - Apply BEFORE planning or coding)**
+*   **Decompose:** Break down the user's request into a detailed feature plan with clear sub-tasks. Use the `write_todos` tool to track these.
+*   **Analyze Context:** Always use `codebase_investigator` for complex tasks or `search_file_content`/`glob` for targeted searches to understand existing architecture, patterns, and data models.
+    *   **Prioritize Direct Data Sources (Project Learning):** Before designing any UI automation or web scraper, you MUST first investigate for APIs or direct download links (XLS, CSV). UI automation is the last resort.
+*   **Conform to Project Structure (Project Learning):** All new modules must adhere to the established project structure and use a formal, package-based approach for imports. Ad-hoc `sys.path` modifications are forbidden.
+*   **Design Data Schema:** For new entities, define clear, normalized schemas.
+*   **Design API Contract:** For new services, define explicit, RESTful contracts.
+*   **Design for Asynchronicity (BEST PRACTICE):** For long-running tasks, prefer event-driven or message queue patterns.
+*   **Design for Scalability (IMPORTANT):** Design services to be stateless for horizontal scaling. Plan caching strategies.
+
+### **Phase 2: Build & Implement (IMPORTANT - Apply DURING coding)**
+*   **Search First (DRY):** Before writing new code, use `search_file_content` or `glob` to find and reuse existing components or patterns.
+    *   **Consult the Tactical Playbook (Project Learning):** Before solving common problems (e.g., parsing complex Excel files, handling web modals), consult the `docs/PROJECT_LEARNINGS.md` document for existing solutions.
+*   **Separate Concerns:** Isolate logic (e.g., UI, business, data access) into distinct modules or functions.
+*   **Small, Focused Functions (BEST PRACTICE):** Ensure each function performs one clear job.
+*   **Analyze Performance:** Be mindful of potential performance bottlenecks (e.g., N+1 queries, excessive memory usage).
+*   **Instrument for Observability (IMPORTANT):** Add structured logs for all new services and critical paths.
+
+### **Phase 3: Verify & Secure (CRITICAL - Apply AFTER coding, BEFORE finalizing)**
+*   **Write New Tests:** Proactively add unit, integration, and end-to-end tests for all new logic, covering edge cases and failure scenarios. Identify existing test frameworks (e.g., `pytest`) and commands.
+    *   **Implement Integration Tests ('Test the Seams') (Project Learning):** In addition to unit tests, you MUST add integration tests that verify the data handoffs between major components.
+*   **Handle All Errors:** Implement robust `try...except` blocks for all potential errors, especially I/O operations and external API calls.
+*   **Sanitize All Inputs:** Assume all external data is malicious. Implement input sanitization to prevent security vulnerabilities.
+*   **Mock External Systems:** In tests, mock all external services for speed and reliability.
+*   **Pass CI Gates:** Before considering a task complete, identify and run project-defined linters, formatters, and type-checkers (e.g., `ruff check .`, `ruff format .`, `mypy`).
+
+### **Phase 4: Deliver & Document (IMPORTANT - Apply AFTER verification, BEFORE completion)**
+*   **Update Documentation:** If you modify or create a component, update its corresponding API docs, diagrams, and READMEs. Ensure `CHANGELOG.md` is updated for significant changes.
+*   **Manage Database Changes (CRITICAL):** For any schema modification, generate a backward-compatible migration script (if applicable to the project's DB setup).
+*   **Ensure Backward Compatibility (CRITICAL):** Avoid breaking changes to existing APIs or interfaces.
+*   **Use Feature Flags (BEST PRACTICE):** For significant new features, wrap logic in a feature flag (if the project supports it).
+
+**Compliance Checklist (Internal Agent Review - MUST be performed before any final output):**
+*   [ ] **Design & Architect:** Have I decomposed the request, analyzed context, and considered schema/API design?
+*   [ ] **Build & Implement:** Have I searched for reusable components and separated concerns?
+*   [ ] **Verify & Secure:** Have I planned for new tests, error handling, and input sanitization?
+*   [ ] **Deliver & Document:** Have I considered documentation updates and backward compatibility?
+
+**Violations of these directives require explicit justification in your thought process.**
 
 ## Documentation Guidelines
 

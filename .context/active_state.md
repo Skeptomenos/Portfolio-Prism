@@ -1,13 +1,14 @@
 # 🔴 Active Session State
-**Objective:** Maintenance
-**Status:** Stable
+**Objective:** Verify Ticker Fix
+**Status:** Ready for User
 
 ## 🛡️ Applied Constraints
-- [Constraint: Stability] - No new features without a formal plan.
+- [Constraint: Accuracy] - Prices must be verified against real market values.
 
 ## 📝 Plan & Progress
-- [x] 1. **Validation Run:** Completed successfully.
-- [ ] 2. **Next Steps:** User to run `./run_dashboard.sh` to explore the data.
+- [x] 1. **Diagnose:** Found `ticker_map.json` corruption.
+- [x] 2. **Fix:** Restored correct map.
+- [ ] 3. **Verify:** User runs pipeline to see correct total.
 
 ## 🧠 Context & Learnings
-*   **Interactive workflows work:** The "Human-in-the-Loop" design for resolving unknown tickers and providers is highly effective and prevents the "garbage in, garbage out" problem.
+- **Garbage In, Garbage Out:** If the Price Oracle (Yahoo Ticker) is wrong, the entire portfolio value is wrong. Always verify mapping files.

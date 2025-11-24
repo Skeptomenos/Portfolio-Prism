@@ -67,8 +67,13 @@ class XtrackersAdapter:
             # Fill missing names with ISIN, or "Unknown Asset" if ISIN is also missing
             holdings_df['name'] = holdings_df['name'].fillna(holdings_df['isin']).fillna("Unknown Asset")
             
-            # Convert decimal weight to percentage (e.g. 0.05 -> 5.0)
-            holdings_df['weight_percentage'] = holdings_df['weight_percentage'] * 100
+            # Auto-Scale Weights: Check if weights are decimal (sum ~ 1.0) or percentage (sum ~ 100.0)
+            weight_sum = holdings_df['weight_percentage'].sum()
+            if weight_sum <= 1.5:
+                logger.info(f"   - Detected decimal weights (Sum={weight_sum:.4f}). Scaling by 100.")
+                holdings_df['weight_percentage'] = holdings_df['weight_percentage'] * 100
+            else:
+                logger.info(f"   - Detected percentage weights (Sum={weight_sum:.2f}). No scaling needed.")
             
             # Ensure ticker column exists (nullable in schema)
             if 'ticker' not in holdings_df.columns:

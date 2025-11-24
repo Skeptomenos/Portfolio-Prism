@@ -126,7 +126,17 @@ class AmundiAdapter:
                  # Drop rows with missing critical data (e.g. footers/disclaimers)
                  # Amundi exports often have trailing disclaimer text that pandas reads as rows
                  initial_len = len(df)
-                 df = df.dropna(subset=['name', 'isin', 'weight_percentage'])
+                 
+                 # Robust NaN/Empty check
+                 df = df.dropna(subset=['name', 'weight_percentage'])
+                 
+                 # Ensure ISIN is a string and looks valid (length > 5), drop if missing
+                 df = df[df['isin'].astype(str).str.len() > 5]
+                 
+                 # Explicitly drop "Total" or "Assets" rows that might be misread
+                 df = df[~df['name'].astype(str).str.contains('Total', case=False, na=False)]
+                 df = df[~df['name'].astype(str).str.contains('Assets', case=False, na=False)]
+
                  if len(df) < initial_len:
                      logger.info(f"    - Dropped {initial_len - len(df)} footer/invalid rows.")
 
@@ -161,6 +171,11 @@ class AmundiAdapter:
                      df['country'] = None
                  if 'currency' not in df.columns:
                      df['currency'] = None
+
+                 # Debug AstraZeneca
+                 astra_row = df[df['name'].astype(str).str.contains("ASTRA", case=False, na=False)]
+                 if not astra_row.empty:
+                     logger.info(f"    - DEBUG: AstraZeneca found in Amundi file. Weight: {astra_row['weight_percentage'].values}")
 
                  # Return standard schema
                  cols_to_return = ['ticker', 'isin', 'name', 'weight_percentage', 'sector', 'country', 'currency']
