@@ -5,7 +5,6 @@ import os
 
 
 
-from src.data.manager import load_positions_from_db
 from src.data.enrichment import enrich_securities
 
 from src.utils.logging_config import get_logger

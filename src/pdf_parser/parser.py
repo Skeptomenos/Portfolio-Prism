@@ -10,11 +10,13 @@ from functools import partial
 from src.pdf_parser.utils import parse_description
 from deep_translator import GoogleTranslator
 from tqdm import tqdm
-from src.data.database import (
-    is_file_processed,
-    mark_file_processed,
-    insert_trades_ignore_duplicates,
-)
+# NOTE: database.py was deleted in Phase 1 (legacy SQLite workflow)
+# The parse_pdfs_from_folder() function doesn't need database imports
+# from src.data.database import (
+#     is_file_processed,
+#     mark_file_processed,
+#     insert_trades_ignore_duplicates,
+# )
 
 # Translation mappings
 HEADER_MAPPING = {
@@ -273,6 +275,56 @@ def process_single_page(args):
     except Exception as e:
         # print(f"Error parsing page {page_idx}: {e}")
         return None, None
+
+
+def parse_pdfs_from_folder(folder_path: Path) -> pd.DataFrame:
+    """
+    Parse all PDFs in folder and return trades DataFrame.
+    
+    This is a simplified version of main() that returns the parsed trades
+    instead of writing to database. Useful for CSV workflows.
+    
+    Args:
+        folder_path: Path to folder containing PDF files
+        
+    Returns:
+        DataFrame with columns: ISIN, NAME, QUANTITY, PRICE, TRADE_TYPE, DATE
+    """
+    pdf_files = list(folder_path.glob("*.pdf"))
+    
+    if not pdf_files:
+        print(f"No PDF files found in {folder_path}")
+        return pd.DataFrame()
+    
+    print(f"Found {len(pdf_files)} PDF file(s)")
+    
+    all_trades_dfs = []
+    
+    for pdf_file in pdf_files:
+        print(f"Processing: {pdf_file.name}")
+        
+        # Get page count
+        with pdfplumber.open(pdf_file) as pdf:
+            num_pages = len(pdf.pages)
+        
+        # Process pages in parallel
+        num_workers = min(multiprocessing.cpu_count(), num_pages)
+        page_args = [(pdf_file, idx) for idx in range(num_pages)]
+        
+        with multiprocessing.Pool(num_workers) as pool:
+            results = pool.map(process_single_page, page_args)
+            
+            for trades, _ in results:
+                if trades is not None and not trades.empty:
+                    all_trades_dfs.append(trades)
+    
+    if all_trades_dfs:
+        full_trades = pd.concat(all_trades_dfs, ignore_index=True)
+        print(f"Parsed {len(full_trades)} trades from {len(pdf_files)} PDF(s)")
+        return full_trades
+    else:
+        print("No trades found in PDFs")
+        return pd.DataFrame()
 
 
 def main():

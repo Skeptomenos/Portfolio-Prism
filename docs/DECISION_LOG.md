@@ -67,3 +67,28 @@ The codebase suffered from "Script Rot": brittle `sys.path` hacks, hardcoded pat
 *   **Robustness:** Tests can now run reliably without path hacks.
 *   **Maintainability:** Changing a data directory now requires editing 1 line in `config.py` instead of 10 files.
 *   **Quality:** Type hints and smaller functions enable better static analysis and testing.
+
+---
+
+## 2025-11-25: Technical Debt Resolution (CSV-First & Tool Automation)
+
+### Decision: Deprecate SQLite Database Workflow
+**Context:** PDF parser wrote to SQLite DB that was no longer used by main pipeline.  
+**Decision:** Delete database modules, preserve CSV-first workflow.  
+**Rationale:** Manual CSV from screenshots = authoritative (complete, current). PDF parser = supplemental for new positions only. Simpler architecture with fewer moving parts.
+
+### Decision: Incremental PDF Parser
+**Context:** PDFs may not have complete historical data.  
+**Decision:** PDF parser only adds new positions, never replaces existing CSV.  
+**Rationale:** Screenshots provide complete portfolio view. PDFs useful for tracking new trades incrementally. Default mode: `add_new` (only append missing ISINs).
+
+### Decision: Ticker Management Automation
+**Context:** 60+ manual entries in `ticker_map.json` with duplicates.  
+**Decision:** Auto-generate from `asset_universe.csv` with validation.  
+**Rationale:** Eliminates manual JSON editing, prevents duplicates and orphaned entries. Single source of truth: `asset_universe.csv`. Implementation: validate/rebuild/sync modes.
+
+### Decision: Asset Management CLI
+**Context:** Manual CSV editing error-prone and requires column order knowledge.  
+**Decision:** Create CLI tool for all asset management operations.  
+**Rationale:** Prevents CSV corruption, validates ISINs before insertion, auto-syncs ticker_map. Better UX with search, validation, and structured output. Commands: add, list, search, validate, remove.
+

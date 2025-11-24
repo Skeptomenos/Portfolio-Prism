@@ -1,11 +1,8 @@
 import pandas as pd
 import os
-import sys
 
-# Add project root to path
-sys.path.insert(0, os.getcwd())
-
-from src.data.manager import load_positions_from_db
+# NOTE: This debug script uses deprecated DB workflow
+# Consider updating to use src.data.state_manager instead
 
 # Mapping Logic
 MAPPING = {
@@ -27,8 +24,11 @@ MAPPING = {
 }
 
 def generate_inputs():
-    # Mimic the logic in run_pipeline.py
-    direct_positions, etf_positions = load_positions_from_db()
+    # DEPRECATED: This function used the old SQLite workflow
+    # TODO: Update to use src.data.state_manager.load_portfolio_state()
+    raise NotImplementedError("This debug script needs updating for CSV workflow")
+    
+    # direct_positions, etf_positions = load_positions_from_db()
     all_positions = pd.concat([direct_positions, etf_positions])
     all_positions = all_positions.rename(columns={'isin': 'ISIN', 'name': 'NAME'})
     

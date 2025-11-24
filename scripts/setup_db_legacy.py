@@ -1,3 +1,10 @@
+"""DEPRECATED: This script uses the old SQLite workflow.
+
+The project now uses CSV-based state management.
+For PDF parsing, use: scripts/parse_pdfs_to_csv.py (when available)
+
+This file is kept for rollback purposes only.
+"""
 import sqlite3
 import pandas as pd
 import sys

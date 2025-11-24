@@ -22,7 +22,8 @@ dependencies = [
     "python-calamine",
     "openpyxl",
     "pytest",
-    "pandera"
+    "pandera",
+    "cryptography",  # Required by pdfplumber
 ]
 
 [tool.setuptools.packages.find]

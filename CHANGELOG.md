@@ -1,5 +1,28 @@
 # Changelog
 
+## [Phase 11] - 2025-11-25
+
+### Added
+- **PDF-to-CSV Parser**: Created `scripts/parse_pdfs_to_csv.py` for incremental portfolio updates from PDFs (3 modes: dry_run, add_new, merge).
+- **Asset Management CLI**: Created `scripts/manage_assets.py` with 5 commands (add, list, search, validate, remove) for managing `asset_universe.csv`.
+- **Data Migration Script**: Created `scripts/migrate_db_to_csv.py` for one-time SQLite → CSV migration.
+- **Ticker Management**: Enhanced `scripts/sync_ticker_map.py` with validation, rebuild, and sync modes.
+
+### Changed
+- **PDF Parser**: Added `parse_pdfs_from_folder()` helper function in `src/pdf_parser/parser.py` for CSV workflow integration.
+
+### Removed
+- **Legacy Database Code**: Deleted `src/data/manager.py` and `src/data/database.py` (SQLite workflow deprecated).
+- **Unused Imports**: Removed `manager.py` imports from `aggregation.py`, `reporting.py`, and `generate_inputs.py`.
+
+### Fixed
+- **Ticker Map**: Rebuilt from 60 entries (with duplicates) to 32 clean entries sorted by ISIN.
+
+### Deprecated
+- **SQLite Workflow**: Renamed `scripts/setup_db.py` → `setup_db_legacy.py` (kept for rollback purposes only).
+
+---
+
 ## [Phase 10] - 2025-11-24
 
 ### Added

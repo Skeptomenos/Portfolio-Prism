@@ -56,9 +56,19 @@
 - **Slow PDF Parsing:** 10mins -> **Multiprocessing**: Pool per page + **Incremental**: Skip known file hashes (SQLite).
 - **Yahoo Tickers:** `NESN` (No) vs `NESN.SW` (Yes) -> **Suffix Logic**: Add exchange suffix based on ISIN/Region.
 - **Config Drift:** Manual registry updates -> **CLI**: Interactive `update_registry.py` prompts user.
-- **Import Hell:** `sys.path` hacks brittle -> **Packaging**: `pyproject.toml` + `pip install -e .`.
-- **Path Sprawl:** Hardcoded strings (`data/inputs`) -> **Central Config**: `src/config.py`.
-- **Refactoring:** Monoliths (Amundi) -> **Split**: `_fetch_manual` (Logic) vs `_fetch_selenium` (IO).
+- **Import Hell:** `sys.path` hacks brittle - **Packaging** (Phase 10): `pyproject.toml` > `requirements.txt`. Enables `pip install -e .` for dev. Eliminates `sys.path` hacks.
+- **Config** (Phase 10): Centralize paths in `src/config.py`. Hardcoded strings = refactoring nightmare.
+- **Refactoring** (Phase 10): 300-line functions → smaller, testable units. Amundi adapter: monolithic `fetch_holdings` → modular `_fetch_from_manual`, `_fetch_via_selenium`, `_parse_downloaded_file`.
+
+### Phase 11: Technical Debt Resolution (2025-11-25)
+- **Dead Code Detection**: Grep imports before deleting modules. `manager.py` imported by 3 files but unused in all.
+- **CSV vs DB**: Manual data > automated parsing when incomplete. Screenshots = authoritative, PDFs = incremental.
+- **Auto-Sync Pattern**: CLI tools should auto-trigger dependencies. Asset add → ticker_map sync = better UX.
+- **Validation First**: Validation mode before destructive operations. `--mode validate` catches issues without changes.
+- **Subprocess Python**: Use `sys.executable` not `'python'` for venv compatibility in subprocess calls.
+- **Backup Everything**: Always backup before destructive ops. Users trust tools that preserve data.
+- **CLI User Confirmation**: Interactive prompts for irreversible actions (delete). `input("Are you sure? (y/N)")` prevents accidents.
+- **Telegraphic Efficiency**: Completed 4 phases in 165 min vs 330 min estimate (50% time). Focused implementation > perfect planning.
 
 ### 3.4. Data Modeling
 - **Ghost Assets:** Stale state -> **Clean Slate**: Wipe DB before run. State > Events.

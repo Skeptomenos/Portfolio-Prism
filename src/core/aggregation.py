@@ -7,7 +7,6 @@ import os
 
 from typing import Dict, List, Any, Optional
 from src.config import TRUE_EXPOSURE_REPORT
-from src.data.manager import load_positions_from_db
 from src.data.enrichment import enrich_securities
 from src.utils.classification import classify_holding
 
