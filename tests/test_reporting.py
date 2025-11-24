@@ -40,7 +40,7 @@ class TestReporting(unittest.TestCase):
             if os.path.exists(f):
                 os.remove(f)
 
-    @patch('phases.active.reporting.enrich_securities')
+    @patch('src.core.reporting.enrich_securities')
     def test_reporting_logic_unit(self, mock_enrich_securities):
         """
         Unit Test: Validates the calculation logic of the reporting module in isolation.
@@ -62,7 +62,7 @@ class TestReporting(unittest.TestCase):
         self.assertAlmostEqual(sector_df[sector_df['sector'] == 'Tech']['portfolio_percentage'].sum(), 77.27, places=2)
         self.assertAlmostEqual(sector_df[sector_df['sector'] == 'Auto']['portfolio_percentage'].sum(), 22.73, places=2)
 
-    @patch('phases.active.reporting.enrich_securities')
+    @patch('src.core.reporting.enrich_securities')
     def test_reporting_integration(self, mock_enrich_securities):
         """
         Integration Test: Validates that the reporting module can correctly

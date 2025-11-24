@@ -12,6 +12,9 @@
 - **Standardization**: Removed all `sys.path.insert(...)` hacks from the codebase.
 - **Cleanup**: Deleted legacy files (`legacy_pipeline.py`, `legacy_prices.py`) and tests.
 
+### Fixed
+- **Test Suite**: Fixed all 9 production tests by updating import paths and removing obsolete mocks (100% passing).
+
 ---
 
 ## [Phase 9] - 2025-11-24

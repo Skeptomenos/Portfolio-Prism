@@ -11,7 +11,7 @@ from src.adapters.xtrackers import XtrackersAdapter
 class TestAdapters(unittest.TestCase):
 
     def get_fixture_path(self, name):
-        return os.path.join(project_root, 'tests', 'fixtures', name)
+        return os.path.join(os.path.dirname(__file__), 'fixtures', name)
 
     @patch('requests.get')
     def test_vaneck_adapter_contract(self, mock_get):

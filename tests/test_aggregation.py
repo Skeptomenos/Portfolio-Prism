@@ -7,13 +7,12 @@ import os
 
 
 from src.core.aggregation import run_aggregation
-
+from src.config import TRUE_EXPOSURE_REPORT
 from unittest import mock
 
 class TestAggregation(unittest.TestCase):
 
-    @mock.patch('phases.active.aggregation.fetch_etf_holdings')
-    def test_aggregation_with_overlapping_indirect_holdings(self, mock_fetch_holdings):
+    def test_aggregation_with_overlapping_indirect_holdings(self):
         """
         Tests the specific scenario where a security is held directly and also
         appears in multiple ETFs, verifying the aggregation logic correctly sums
@@ -32,7 +31,7 @@ class TestAggregation(unittest.TestCase):
         }
 
         # 2. Run the aggregation logic
-        output_file = os.path.join(project_root, 'outputs', 'true_exposure_report.csv')
+        output_file = str(TRUE_EXPOSURE_REPORT)
         if os.path.exists(output_file):
             os.remove(output_file)
         
