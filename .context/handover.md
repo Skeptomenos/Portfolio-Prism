@@ -1,77 +1,46 @@
-# Session Handover: Technical Debt Resolution Complete
+# Session Handover: Stability & Data Integrity (Phase 11.5)
 
 **Date:** 2025-11-25  
-**Session Focus:** Resolve all 4 known technical debt items  
-**Status:** ✅ 100% Complete
+**Session Focus:** Fix Critical Valuation Bugs (Currency, Aggregation, Naming)  
+**Status:** ✅ 100% Fixed & Validated
 
 ---
 
 ## What Was Accomplished
 
-### Phase 1: Legacy Module Cleanup (20 min)
-- Deleted `src/data/manager.py` and `src/data/database.py`
-- Removed unused imports from 3 files
-- Renamed `setup_db.py` → `setup_db_legacy.py`
-- **Result:** All tests passing (9/9)
+### 1. Fixed "Massive Valuation" Bugs
+- **Xiaomi (HKD Issue):** Fixed 10x overvaluation. Implemented **Currency Normalization** in `market.py`.
+    - *Before:* ~1,210€ (Naive HKD price treated as EUR)
+    - *After:* ~135€ (Correctly converted using HKD/EUR rate)
+- **Ghost Nvidia (Aggregation Issue):** Fixed 35k phantom exposure.
+    - Root Cause: Numeric string parsing error ("22,50" -> String).
+    - Fix: Added robust `pd.to_numeric(..., errors='coerce')` in `aggregation.py`.
+    - Fix: Purged corrupted `adapter_cache`.
 
-### Phase 1.5: Data Migration (10 min)
-- Created `scripts/migrate_db_to_csv.py`
-- Decision: Keep CSV (30 positions, authoritative)
-- Skipped DB migration (21 positions, incomplete)
+### 2. Fixed Identity Confusion
+- **S&P 500 Duplicates:** Resolved confusion between Distributing (`IUSA`) and Accumulating (`SXR8`) ETFs.
+    - *Action:* Renamed in `asset_universe.csv` to "iShares Core S&P 500 ETF (Dist)" and "... (Acc)".
+    - *Result:* Distinct entries in reports.
 
-### Phase 2: PDF-to-CSV Parser (45 min)
-- Created `scripts/parse_pdfs_to_csv.py`
-- 3 modes: dry_run, add_new (default), merge
-- Added `parse_pdfs_from_folder()` helper in parser.py
-- **Test:** 1,199 trades → 21 positions parsed
-
-### Phase 3: Ticker Management (30 min)
-- Enhanced `scripts/sync_ticker_map.py` (48 → 221 lines)
-- 3 modes: validate, rebuild, sync
-- **Impact:** 60 entries → 32 clean entries
-
-### Phase 4: Asset Management CLI (60 min)
-- Created `scripts/manage_assets.py` (365 lines)
-- 5 commands: add, list, search, validate, remove
-- ISIN validation, auto-sync, auto-backup
-
-**Total Time:** 165 minutes (50% of estimate)
+### 3. Documentation & Process
+- Updated `CHANGELOG.md` and `DECISION_LOG.md`.
+- Added critical learnings (Currency Blindness, Numeric Hygiene) to `PROJECT_LEARNINGS.md`.
 
 ---
 
 ## Files Modified
-
-**Created:**
-- `scripts/parse_pdfs_to_csv.py`
-- `scripts/manage_assets.py`
-- `scripts/migrate_db_to_csv.py`
-
-**Deleted:**
-- `src/data/manager.py`
-- `src/data/database.py`
-
-**Modified:**
-- `scripts/sync_ticker_map.py` (complete rewrite)
-- `src/pdf_parser/parser.py` (added helper function)
-- `config/ticker_map.json` (rebuilt clean)
-
-**Documentation:**
-- `CHANGELOG.md` (Phase 11 added)
-- `docs/DECISION_LOG.md` (4 decisions added)
-- `docs/PROJECT_LEARNINGS.md` (8 learnings added)
+- `src/data/market.py`: Added currency detection and FX conversion.
+- `src/core/aggregation.py`: Added numeric coercion and safety logs.
+- `config/asset_universe.csv`: Renamed S&P 500 ETFs.
+- `docs/*`: Updated all logs.
 
 ---
 
-## Test Status
-**All Tests Passing:** 9/9 (100%)
-
----
+## System Status
+- **Pipeline:** Running Green.
+- **Reports:** `outputs/true_exposure_report.csv` and `outputs/direct_holdings_report.csv` are accurate.
+- **Tests:** 9/9 Passing.
 
 ## Next Steps
-1. Commit to GitHub: All Phase 11 changes
-2. Optional: Delete `data/working/database/` if no longer needed
-
----
-
-## For Next Session
-Project is production-ready with clean architecture. All technical debt resolved.
+- Routine: Run `scripts/run_pipeline.py` to refresh data.
+- Feature: Consider adding a dedicated FX rate cache if performance slows down.

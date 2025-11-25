@@ -16,6 +16,7 @@ For most investors, this exposure is a black box.
 *   **Look-Through Analysis:** Decomposes ETFs into their underlying holdings (Stocks) using provider-specific data adapters.
 *   **Hybrid Data Sourcing:** Fetches data via APIs (iShares), Direct Downloads (VanEck, Xtrackers), or Manual File Drops (Amundi).
 *   **Live Pricing:** Uses `yfinance` to get real-time market values for 50,000+ global assets.
+*   **Asset Management CLI:** `scripts/manage_assets.py` provides add, list, search, validate, and remove commands for `asset_universe.csv` and auto‑syncs the ticker map.
 *   **Automated Reports:** Generates:
     *   `true_exposure_report.csv`: Every single underlying asset you own.
     *   `top_10_holdings.csv`: Your biggest real bets.

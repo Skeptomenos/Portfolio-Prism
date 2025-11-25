@@ -23,9 +23,7 @@ src/core/validation.py
 src/dashboard/app.py
 src/data/__init__.py
 src/data/caching.py
-src/data/database.py
 src/data/enrichment.py
-src/data/manager.py
 src/data/market.py
 src/data/normalization.py
 src/data/state_manager.py

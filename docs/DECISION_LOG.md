@@ -92,3 +92,17 @@ The codebase suffered from "Script Rot": brittle `sys.path` hacks, hardcoded pat
 **Decision:** Create CLI tool for all asset management operations.  
 **Rationale:** Prevents CSV corruption, validates ISINs before insertion, auto-syncs ticker_map. Better UX with search, validation, and structured output. Commands: add, list, search, validate, remove.
 
+---
+
+## 2025-11-25: Stability & Data Integrity (Phase 11.5)
+
+### Decision: Enforce Base Currency Normalization
+**Context:** `yfinance` returns prices in local currency (HKD, GBP, USD). Naive multiplication with quantity results in massive valuation errors (e.g., Xiaomi valued 10x higher because HKD/EUR ~0.11).
+**Decision:** All prices fetched from external APIs *must* be converted to the portfolio's Base Currency (EUR) immediately upon receipt.
+**Implementation:** `market.py` now detects the currency of the ticker and applies a real-time FX rate conversion before returning the price map.
+
+### Decision: Distinct Naming for ISIN Variants
+**Context:** The system contained two S&P 500 ETFs (Distributing vs Accumulating) with the exact same Name string. This made debugging impossible and confused the user (duplicate entries).
+**Decision:** `asset_universe.csv` names must be semantically distinct even if the provider calls them the same thing.
+**Implementation:** Renamed to "... (Dist)" and "... (Acc)" to enforce uniqueness and clarity.
+

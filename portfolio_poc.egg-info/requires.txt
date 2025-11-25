@@ -12,3 +12,4 @@ python-calamine
 openpyxl
 pytest
 pandera
+cryptography

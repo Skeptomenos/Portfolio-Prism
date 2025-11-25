@@ -111,13 +111,20 @@ def run_aggregation(
                     etf_holdings['isin'] = [f"UNKNOWN_{i}" for i in range(len(etf_holdings))]
             
             # Calculate indirect value
+            # Ensure weight_percentage is a float
+            if 'weight_percentage' in etf_holdings.columns:
+                 etf_holdings['weight_percentage'] = etf_holdings['weight_percentage'].astype(str).str.replace(',', '.').apply(pd.to_numeric, errors='coerce').fillna(0.0)
+            else:
+                 etf_holdings['weight_percentage'] = 0.0
+
             etf_holdings['indirect'] = etf_holdings['weight_percentage'] / 100 * etf_market_value
             
             # DEBUG: Trace Large Holdings
             huge = etf_holdings[etf_holdings['indirect'] > 1000]
             if not huge.empty:
                  logger.info(f"🔎 FOUND LARGE HOLDING in ETF {etf_isin} ({etf['name']}):")
-                 logger.info(huge[['name', 'weight_percentage', 'indirect']].to_string())
+                 for _, row in huge.iterrows():
+                     logger.info(f"    -> {row.get('name', 'Unknown')} ({row.get('isin', 'No ISIN')}): {row['weight_percentage']:.2f}% = €{row['indirect']:,.2f}")
             
             all_holdings = pd.concat([all_holdings, etf_holdings])
 

@@ -18,3 +18,4 @@ Requires-Dist: python-calamine
 Requires-Dist: openpyxl
 Requires-Dist: pytest
 Requires-Dist: pandera
+Requires-Dist: cryptography

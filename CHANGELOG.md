@@ -1,5 +1,15 @@
 # Changelog
 
+## [Phase 11.5] - 2025-11-25
+
+### Fixed
+- **Currency Blindness**: Fixed a major valuation bug where `yfinance` prices in foreign currencies (e.g., HKD) were treated as EUR. Added a mandatory FX rate conversion layer in `src/data/market.py`.
+- **Ghost Values**: Fixed an aggregation bug where numeric strings (e.g., "22,50") caused massive outliers (e.g., 35k Nvidia). Implemented strict numeric coercion in `src/core/aggregation.py`.
+- **Asset Confusion**: Renamed "iShares Core S&P 500 ETF" variants in `asset_universe.csv` to explicitly distinguish between `(Acc)` and `(Dist)`, resolving duplicate entries.
+- **Cache Integrity**: Purged corrupted adapter cache to eliminate phantom data.
+
+---
+
 ## [Phase 11] - 2025-11-25
 
 ### Added

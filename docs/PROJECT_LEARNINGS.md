@@ -70,6 +70,12 @@
 - **CLI User Confirmation**: Interactive prompts for irreversible actions (delete). `input("Are you sure? (y/N)")` prevents accidents.
 - **Telegraphic Efficiency**: Completed 4 phases in 165 min vs 330 min estimate (50% time). Focused implementation > perfect planning.
 
+### Phase 11.5: Troubleshooting & Stability (2025-11-25)
+- **Currency Blindness:** `yfinance` returns *local* currency (e.g., HKD for Xiaomi). **Rule:** Always check `ticker.fast_info['currency']` and normalize to Base Currency (EUR) immediately.
+- **Numeric Hygiene:** "Ghost" values (35k Nvidia) often stem from string/float mismatches (e.g., "22,50" treated as string). **Rule:** Explicitly coerce columns to numeric (`pd.to_numeric(..., errors='coerce')`) before aggregation.
+- **Cache Rot:** Changing parser logic without clearing `data/working/cache` leads to "Zombie Data". **Rule:** If parser logic changes, automated cache invalidation (or versioning) is required.
+- **Semantic Naming:** Distinct ISINs with identical Names (S&P 500 Dist vs Acc) cause debug confusion. **Rule:** Enforce distinct names in `asset_universe` for distinct ISINs.
+
 ### 3.4. Data Modeling
 - **Ghost Assets:** Stale state -> **Clean Slate**: Wipe DB before run. State > Events.
 - **ID Conflict:** Ticker (Price) vs ISIN (Holdings) -> **Relational**: `asset_universe` maps ISIN <-> Ticker.

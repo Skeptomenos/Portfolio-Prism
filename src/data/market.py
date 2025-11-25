@@ -83,10 +83,66 @@ def resolve_ticker(isin):
         
     return None
 
+def _get_ticker_currency(ticker_symbol):
+    """
+    Determines the currency of a ticker using heuristics or API.
+    """
+    # 1. Heuristics based on suffix
+    if ticker_symbol.endswith(('.DE', '.F', '.MI', '.PA', '.AS', '.MC', '.VI')):
+        return 'EUR'
+    if ticker_symbol.endswith('.L'):
+        # LSE can be GBP, GBp (pence), or USD. Hard to guess.
+        # Fallback to API.
+        pass
+    if ticker_symbol.endswith('.HK'):
+        return 'HKD'
+    
+    # 2. API Check
+    try:
+        t = yf.Ticker(ticker_symbol)
+        # fast_info is fast and usually contains currency
+        currency = t.fast_info.get('currency')
+        if currency:
+            return currency
+    except:
+        pass
+        
+    # Default to USD for US-looking tickers (no dot)
+    if '.' not in ticker_symbol:
+        return 'USD'
+        
+    return 'USD' # Safe default? Or raise?
+
+def _get_fx_rate(from_currency, to_currency='EUR'):
+    """
+    Fetches FX rate. Returns 1.0 if same.
+    """
+    if from_currency == to_currency:
+        return 1.0
+        
+    # Special handling for GBp (British Pence)
+    if from_currency == 'GBp':
+        # 100 GBp = 1 GBP. 
+        # Get GBP->EUR rate and divide by 100
+        gbp_eur = _get_fx_rate('GBP', 'EUR')
+        return gbp_eur / 100.0
+
+    pair = f"{from_currency}{to_currency}=X"
+    try:
+        t = yf.Ticker(pair)
+        # minimal fetch
+        hist = t.history(period="1d")
+        if not hist.empty:
+            return float(hist['Close'].iloc[-1])
+    except:
+        logger.warning(f"Could not fetch FX rate for {pair}")
+    
+    return 1.0 # Fallback (dangerous but keeps pipeline moving)
+
 def _fetch_prices_batch(tickers):
     """
     Robust batch fetching with escalation strategy.
-    Returns a dict {ticker: price}.
+    Returns a dict {ticker: price_in_eur}.
     """
     prices = {}
     remaining_tickers = [t for t in tickers if t] # Filter Nones
@@ -97,6 +153,8 @@ def _fetch_prices_batch(tickers):
     # Escalation Strategy: 1d -> 5d -> 1mo
     periods = ["1d", "5d", "1mo"]
     
+    raw_prices = {}
+
     for period in periods:
         if not remaining_tickers:
             break
@@ -109,15 +167,11 @@ def _fetch_prices_batch(tickers):
             data = yf.download(remaining_tickers, period=period, group_by='ticker', threads=True, progress=False)
             
             # If only one ticker, data structure is different (single level columns)
-            # We standardize it
             if len(remaining_tickers) == 1:
-                # Reconstruct dict-like access
-                # But yf.download for 1 ticker returns just the dataframe
-                # Let's handle it simply
                 ticker = remaining_tickers[0]
                 if not data.empty and 'Close' in data.columns:
                     last_valid = data['Close'].dropna().iloc[-1]
-                    prices[ticker] = float(last_valid)
+                    raw_prices[ticker] = float(last_valid)
                     remaining_tickers = []
                 continue
 
@@ -125,38 +179,46 @@ def _fetch_prices_batch(tickers):
             found_in_batch = []
             for ticker in remaining_tickers:
                 try:
-                    # Access data for this ticker
-                    # If failed, it might not be in columns or have all NaNs
                     if ticker in data.columns:
                         ticker_data = data[ticker]
                         if 'Close' in ticker_data.columns:
                             series = ticker_data['Close'].dropna()
                             if not series.empty:
-                                prices[ticker] = float(series.iloc[-1])
+                                raw_prices[ticker] = float(series.iloc[-1])
                                 found_in_batch.append(ticker)
                 except Exception:
                     continue
             
-            # Remove found tickers from the list for next iteration
             remaining_tickers = [t for t in remaining_tickers if t not in found_in_batch]
             
         except Exception as e:
             logger.error(f"Batch fetch failed for period {period}: {e}")
 
-    # Fallback: Individual Fetch for stubborn tickers
+    # Fallback: Individual Fetch
     if remaining_tickers:
         logger.info(f"Falling back to individual fetch for {len(remaining_tickers)} tickers...")
         for ticker in remaining_tickers:
             try:
                 t = yf.Ticker(ticker)
-                hist = t.history(period="1mo") # Go reasonably far back
+                hist = t.history(period="1mo")
                 if not hist.empty:
-                    prices[ticker] = float(hist['Close'].iloc[-1])
+                    raw_prices[ticker] = float(hist['Close'].iloc[-1])
                     logger.debug(f"Recovered {ticker} via individual fetch.")
                 else:
                     logger.warning(f"Failed to fetch price for {ticker} (Delisted or Invalid)")
             except Exception as e:
                  logger.warning(f"Error fetching {ticker}: {e}")
+
+    # --- Currency Conversion Step ---
+    logger.info("Normalizing prices to EUR...")
+    for ticker, price in raw_prices.items():
+        currency = _get_ticker_currency(ticker)
+        if currency != 'EUR':
+            rate = _get_fx_rate(currency, 'EUR')
+            prices[ticker] = price * rate
+            # logger.debug(f"Converted {ticker}: {price} {currency} -> {prices[ticker]:.2f} EUR (Rate: {rate:.4f})")
+        else:
+            prices[ticker] = price
                  
     return prices
 
