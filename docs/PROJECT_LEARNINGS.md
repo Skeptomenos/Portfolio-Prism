@@ -75,6 +75,7 @@
 - **Numeric Hygiene:** "Ghost" values (35k Nvidia) often stem from string/float mismatches (e.g., "22,50" treated as string). **Rule:** Explicitly coerce columns to numeric (`pd.to_numeric(..., errors='coerce')`) before aggregation.
 - **Cache Rot:** Changing parser logic without clearing `data/working/cache` leads to "Zombie Data". **Rule:** If parser logic changes, automated cache invalidation (or versioning) is required.
 - **Semantic Naming:** Distinct ISINs with identical Names (S&P 500 Dist vs Acc) cause debug confusion. **Rule:** Enforce distinct names in `asset_universe` for distinct ISINs.
+- **API Data Merging:** When enriching data from external APIs (e.g., Finnhub), prioritize locally resolved high-confidence data (like ISINs from `asset_universe.csv`) over potentially missing or incomplete API responses. Avoid blind overwrites.
 
 ### 3.4. Data Modeling
 - **Ghost Assets:** Stale state -> **Clean Slate**: Wipe DB before run. State > Events.

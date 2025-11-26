@@ -5,15 +5,12 @@
 ## 🛡️ Applied Constraints
 - [Constraint: Packaging] - All code must run as an installed package. No `sys.path` hacks.
 - [Constraint: Currency] - All prices must be normalized to EUR immediately.
-- [Constraint: Data Authority] - Local `asset_universe.csv` is the source of truth for ISINs. API data must not overwrite valid local ISINs.
 
 ## 📝 Plan & Progress
 - [x] 1. **Modernize:** Packaging, Config, Refactoring.
 - [x] 2. **Stabilize:** Fix Pricing (Currency), Aggregation (Numeric), and Naming (S&P 500).
-- [x] 3. **Fix:** Resolved Nvidia overvaluation (ISIN resolution priority).
-- [ ] 4. **Next:** User to define next objective.
+- [ ] 3. **Next:** User to define next objective.
 
 ## 🧠 Context & Learnings
 - **Structure is Destiny:** Proper packaging eliminates a whole class of import errors.
 - **Currency is Critical:** Never assume USD/EUR. always normalize.
-- **Trust Local Data:** External APIs can be incomplete. Don't let them overwrite your valid local data.

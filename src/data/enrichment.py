@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 
 from src.data.caching import load_from_cache, save_to_cache, get_cache_key
+from src.config import ASSET_UNIVERSE_PATH
+import pandas as pd
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,6 +41,24 @@ def fetch_from_yfinance(identifier: str) -> Optional[Dict[str, str]]:
         pass
     return None
 
+def load_asset_universe() -> Dict[str, str]:
+    """
+    Loads the asset universe and returns a mapping of Ticker -> ISIN.
+    """
+    if not os.path.exists(ASSET_UNIVERSE_PATH):
+        return {}
+    try:
+        df = pd.read_csv(ASSET_UNIVERSE_PATH)
+        # Create mapping from Yahoo Ticker to ISIN
+        # Ensure we drop NaNs
+        mapping = df.dropna(subset=['Yahoo_Ticker', 'ISIN']).set_index('Yahoo_Ticker')['ISIN'].to_dict()
+        return mapping
+    except Exception as e:
+        print(f"Warning: Failed to load asset universe: {e}")
+        return {}
+
+_UNIVERSE_MAPPING = None
+
 def enrich_securities_bulk(
     securities_to_fetch: List[Dict[str, Any]], 
     force_refresh: bool = False
@@ -56,6 +76,11 @@ def enrich_securities_bulk(
     enriched_results = []
     session = requests.Session()
     session.headers.update({'X-Finnhub-Token': FINNHUB_API_KEY})
+
+    # Load Universe Mapping (Lazy Load)
+    global _UNIVERSE_MAPPING
+    if _UNIVERSE_MAPPING is None:
+        _UNIVERSE_MAPPING = load_asset_universe()
 
     # Counter for progress feedback
     count = 0
@@ -91,6 +116,13 @@ def enrich_securities_bulk(
             'sector': 'Unknown', 'geography': 'Unknown'
         }
         
+        # 0. Check Asset Universe (Local Resolution)
+        if identifier in _UNIVERSE_MAPPING:
+            result['isin'] = _UNIVERSE_MAPPING[identifier]
+            # If we have the ISIN, we might still want sector/geo from API, 
+            # but at least we have the ID.
+            print("L", end="", flush=True) # L for Local
+        
         # Primary: Finnhub
         try:
             response = session.get(f"{FINNHUB_API_URL}/stock/profile2", params={'symbol': identifier})
@@ -98,13 +130,19 @@ def enrich_securities_bulk(
             if response.status_code == 200:
                 profile_data = response.json()
                 if profile_data:
-                    result = {
+                    # Update result but preserve ISIN if Finnhub misses it
+                    finnhub_isin = profile_data.get('isin')
+                    
+                    result.update({
                         'ticker': profile_data.get('ticker', identifier),
-                        'isin': profile_data.get('isin', 'N/A'),
                         'name': profile_data.get('name', 'N/A'),
                         'sector': profile_data.get('finnhubIndustry', 'Unknown'),
                         'geography': profile_data.get('country', 'Unknown')
-                    }
+                    })
+                    
+                    # Only overwrite ISIN if Finnhub provides a valid one
+                    if finnhub_isin:
+                        result['isin'] = finnhub_isin
                     # Visual feedback for API hit
                     print("F", end="", flush=True) # F for Finnhub
                 else:

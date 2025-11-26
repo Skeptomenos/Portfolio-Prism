@@ -106,3 +106,16 @@ The codebase suffered from "Script Rot": brittle `sys.path` hacks, hardcoded pat
 **Decision:** `asset_universe.csv` names must be semantically distinct even if the provider calls them the same thing.
 **Implementation:** Renamed to "... (Dist)" and "... (Acc)" to enforce uniqueness and clarity.
 
+
+## 2025-11-26: Local Resolution Priority (Data Enrichment)
+
+### Context
+The `enrichment.py` module was fetching data from the Finnhub API. However, for some securities (like Nvidia in iShares ETFs), Finnhub returned `N/A` for the ISIN, overwriting the correct ISIN that had already been resolved locally from `asset_universe.csv`. This caused downstream aggregation failures (ghost assets).
+
+### Decision
+**Local Authority:** Locally resolved data (from `asset_universe.csv`) is considered authoritative for identity (ISIN). External APIs are treated as "Enrichment Only".
+**Implementation:** Modified `enrichment.py` to check if an ISIN is already present. If so, the API response only updates metadata (Sector, Geography) and *never* overwrites the ISIN unless the API provides a non-null value.
+
+### Consequences
+*   **Reliability:** Prevents "regression by enrichment" where valid data is destroyed by incomplete API responses.
+*   **Stability:** Fixes the Nvidia overvaluation bug permanently.

@@ -10,6 +10,10 @@ INPUTS_DIR = DATA_DIR / "inputs"
 MANUAL_INPUTS_DIR = INPUTS_DIR / "manual_holdings"
 WORKING_DIR = DATA_DIR / "working"
 RAW_DOWNLOADS_DIR = WORKING_DIR / "raw_downloads"
+CONFIG_DIR = PROJECT_ROOT / "config"
+
+# File Paths
+ASSET_UNIVERSE_PATH = CONFIG_DIR / "asset_universe.csv"
 
 # Output Directories
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"

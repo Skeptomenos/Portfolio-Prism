@@ -1,46 +1,24 @@
-# Session Handover: Stability & Data Integrity (Phase 11.5)
+# 🤝 Handover: Nvidia Fix & Stability
 
-**Date:** 2025-11-25  
-**Session Focus:** Fix Critical Valuation Bugs (Currency, Aggregation, Naming)  
-**Status:** ✅ 100% Fixed & Validated
+## 🏁 Previous Session Summary
+We successfully investigated and fixed a critical bug where Nvidia was vastly overvalued (~€33k vs ~€5k) in the `full_holdings.csv` report.
 
----
+**Root Cause:**
+The `enrichment.py` module was correctly identifying Nvidia's ISIN locally but then overwriting it with `N/A` from a Finnhub API response. This caused the holding to be treated as a "Ghost Asset" without an ISIN, breaking aggregation.
 
-## What Was Accomplished
+**Fix Implemented:**
+- Modified `src/data/enrichment.py` to prioritize local ISINs from `asset_universe.csv`.
+- Added logic to only update ISIN from API if the API actually provides a value.
 
-### 1. Fixed "Massive Valuation" Bugs
-- **Xiaomi (HKD Issue):** Fixed 10x overvaluation. Implemented **Currency Normalization** in `market.py`.
-    - *Before:* ~1,210€ (Naive HKD price treated as EUR)
-    - *After:* ~135€ (Correctly converted using HKD/EUR rate)
-- **Ghost Nvidia (Aggregation Issue):** Fixed 35k phantom exposure.
-    - Root Cause: Numeric string parsing error ("22,50" -> String).
-    - Fix: Added robust `pd.to_numeric(..., errors='coerce')` in `aggregation.py`.
-    - Fix: Purged corrupted `adapter_cache`.
+**Verification:**
+- Ran full pipeline (`scripts/run_pipeline.py`).
+- Confirmed `outputs/true_exposure_report.csv` shows a single, correct Nvidia entry (~€5,088).
 
-### 2. Fixed Identity Confusion
-- **S&P 500 Duplicates:** Resolved confusion between Distributing (`IUSA`) and Accumulating (`SXR8`) ETFs.
-    - *Action:* Renamed in `asset_universe.csv` to "iShares Core S&P 500 ETF (Dist)" and "... (Acc)".
-    - *Result:* Distinct entries in reports.
+## 📂 Key Files
+- `src/data/enrichment.py`: Contains the fix logic.
+- `src/core/aggregation.py`: Aggregation logic (cleaned of debug logs).
+- `outputs/true_exposure_report.csv`: Validated output.
 
-### 3. Documentation & Process
-- Updated `CHANGELOG.md` and `DECISION_LOG.md`.
-- Added critical learnings (Currency Blindness, Numeric Hygiene) to `PROJECT_LEARNINGS.md`.
-
----
-
-## Files Modified
-- `src/data/market.py`: Added currency detection and FX conversion.
-- `src/core/aggregation.py`: Added numeric coercion and safety logs.
-- `config/asset_universe.csv`: Renamed S&P 500 ETFs.
-- `docs/*`: Updated all logs.
-
----
-
-## System Status
-- **Pipeline:** Running Green.
-- **Reports:** `outputs/true_exposure_report.csv` and `outputs/direct_holdings_report.csv` are accurate.
-- **Tests:** 9/9 Passing.
-
-## Next Steps
-- Routine: Run `scripts/run_pipeline.py` to refresh data.
-- Feature: Consider adding a dedicated FX rate cache if performance slows down.
+## ⚠️ Watchlist / Next Steps
+- **Monitor Enrichment:** Ensure other assets aren't missing metadata due to similar API issues.
+- **Asset Universe:** Keep `asset_universe.csv` up to date as the source of truth.
