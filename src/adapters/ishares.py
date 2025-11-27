@@ -162,9 +162,13 @@ class ISharesAdapter:
             holdings_df = pd.read_csv(csv_data, skiprows=2)
             logger.info(f"   - Successfully parsed CSV. Found {len(holdings_df)} rows.")
 
-            # We only need Ticker, Name, Weight, Location, and Exchange.
-            # Note: iShares CSV does NOT contain ISIN, so we must construct a Yahoo-compatible ticker.
+            # We need: Ticker (raw from provider), Name, Weight, Location, and Exchange.
+            # Note: iShares CSV does NOT contain ISIN, so we preserve raw ticker and construct Yahoo-compatible ticker.
             holdings_df = holdings_df[['Emittententicker', 'Name', 'Gewichtung (%)', 'Standort', 'Börse']].copy()
+            
+            # Preserve the raw ticker from provider before any transformations
+            holdings_df['raw_ticker'] = holdings_df['Emittententicker']
+            
             holdings_df.rename(columns={
                 'Emittententicker': 'ticker',
                 'Name': 'name',

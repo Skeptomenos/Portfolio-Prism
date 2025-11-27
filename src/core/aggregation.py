@@ -51,12 +51,15 @@ def run_aggregation(
 
     # 2. Process Indirect Holdings
     logger.info("Processing indirect holdings (via ETFs)...")
+    logger.info(f"Total ETFs to process: {len(etf_positions)}") # Changed from etf_holdings_map to etf_positions for count of ETFs to be processed
     all_holdings = pd.DataFrame()
     if not etf_positions.empty:
-        for _, etf in etf_positions.iterrows():
+        # Assuming etf_positions already contains only ETFs, no need for asset_class filter here.
+        # Iterating as dict records is generally more efficient than iterrows for many operations.
+        for etf in etf_positions.to_dict('records'): 
             etf_isin = etf['isin']
             etf_market_value = etf['market_value']
-            logger.info(f"  - Processing ETF: {etf['name']} (Value: €{etf_market_value:,.2f})")
+            logger.info(f"  - Processing ETF: {etf['name']} (ISIN: {etf_isin}, Value: €{etf_market_value:,.2f})")
 
             etf_holdings = etf_holdings_map.get(etf_isin)
             if etf_holdings is None or etf_holdings.empty:
@@ -102,6 +105,15 @@ def run_aggregation(
                     # Merge enrichment back into main dataframe
                     etf_holdings = pd.merge(etf_holdings, enriched_df[['ticker', 'isin']], on='ticker', how='left')
                     logger.info("    - Enrichment complete. Merged ISINs into holdings.")
+                    
+                    # Log ISIN resolution failures
+                    failed_isin = etf_holdings[(etf_holdings['asset_class'] == 'Equity') & (etf_holdings['isin'] == 'N/A')]
+                    if not failed_isin.empty:
+                        logger.warning(f"    ⚠️  {len(failed_isin)} securities FAILED ISIN resolution:")
+                        for ticker in failed_isin['ticker'].head(10):
+                            logger.warning(f"        - {ticker}")
+                        if len(failed_isin) > 10:
+                            logger.warning(f"        ... and {len(failed_isin) - 10} more")
                     
                     # Fill missing ISINs for Non-Equities with a placeholder
                     missing_isin_mask = etf_holdings['isin'].isnull()

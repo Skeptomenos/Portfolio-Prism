@@ -90,42 +90,35 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Initialize database
-python phases/shared/database.py
 ```
 
 ### Running the Pipeline
 
-**Phase 1: PDF Parsing & Position Keeping**
+**Full Pipeline (PDFs + Analysis)**
 ```bash
-# Parse PDFs (place PDFs in data/inputs/ first)
-python phases/completed/pdf_parser.py
+# Runs legacy DB setup + Core Pipeline
+./run.sh
+```
 
-# Test mode (validates parser against known data)
-python phases/completed/pdf_parser.py --test
+**Core Analysis Pipeline Only**
+```bash
+# Skips PDF parsing, runs logic on existing data
+python -m scripts.run_pipeline
+```
 
-# Calculate positions
-python phases/completed/position_keeper.py
+**PDF Parsing (Modern CSV Mode)**
+```bash
+# Incrementally parses PDFs to CSV
+python -m scripts.parse_pdfs_to_csv --mode add_new
+
+# Preview changes without saving
+python -m scripts.parse_pdfs_to_csv --mode dry_run
 ```
 
 **Phase 2: Security Mapping & Pricing**
 ```bash
-# Requires OPENFIGI_API_KEY in .env
-python phases/completed/phase2_pipeline.py
-```
-
-**Phase 3: Holdings Acquisition (BLOCKED)**
-```bash
-# Current blocker: Run individual adapters but pipeline integration incomplete
-# Proven working: iShares and Xtrackers direct downloads
-python phases/active/holdings_fetcher.py  # Dispatcher (needs debugging)
-```
-
-**End-to-End POC**
-```bash
-# Requires completed Phase 3 data
-python poc.py
+# (Integrated into run_pipeline, but can be managed manually)
+python -m scripts.manage_assets
 ```
 
 ### Testing & Quality
@@ -136,96 +129,51 @@ ruff check .
 # Formatting
 ruff format .
 
-# Tests (currently empty - KNOWN GAP)
+# Tests
 pytest
-pytest path/to/test_file.py::test_function_name
 ```
 
 ### Debugging
 ```bash
-# Debug preprocessor (for PDF parsing issues)
-python debug/debug_preprocessor.py
-
 # Inspector pattern (for web scraping - creates evidence)
-python debug/spike_ishares_inspector.py  # Example
+python debug/inspect_amundi.py
 ```
 
 ## Architecture
 
-### 5-Phase Pipeline
-```
-Phase 1: Portfolio Ingestion (PDF → trades) ✅
-Phase 2: Security Mapping & Pricing (ISIN → ticker → price) ✅
-Phase 3: Holdings Ingestion (ETF ticker → holdings CSV/XLSX) 🔴 BLOCKED
-Phase 4: Aggregation (Calculate true exposure) ⏸️ Ready
-Phase 5: POC Script (End-to-end) ⏸️ Ready
-```
-
 ### Directory Structure
 ```
-phases/
-  completed/     - Phases 1-2 (working production code)
-  active/        - Phase 3 (blocked integration)
-    adapters/    - Provider-specific scrapers (ishares, xtrackers, amundi, vaneck)
-  shared/        - Utilities (database, validation, parser)
-data/
-  inputs/        - Trade Republic PDFs go here
-  portfolio.db   - SQLite DB (14 securities, 0 holdings - empty due to Phase 3)
-outputs/         - Generated CSVs (Reports)
-holdings_engine/ - Spike scripts (feasibility testing - proven working)
-debug/           - Debug scripts, screenshots, saved HTML
-.llm/            - Learning persistence and task logs
+src/             - Main source code
+  adapters/      - Provider-specific scrapers (ishares, xtrackers, etc.)
+  core/          - Business logic (aggregation, reporting)
+  data/          - Data access (market, state_manager)
+  pdf_parser/    - PDF extraction logic
+  utils/         - Shared utilities (logging, schemas)
+config/          - Configuration files (JSON, CSV)
+scripts/         - Executable scripts (entry points)
+data/            - Input/Output data
+  inputs/        - Trade Republic PDFs
+  true_data/     - Source of Truth CSVs
+  working/       - Intermediate files
+outputs/         - Generated Reports
+debug/           - Debug scripts & artifacts
+docs/            - Documentation
 ```
 
 ### Critical Files
-- `poc.py` - Main entry point (76 lines, orchestrates all phases)
-- `phases/shared/database.py` - SQLite schema (securities, holdings, metadata)
-- `phases/active/holdings_fetcher.py` - Adapter dispatcher (HAS DUPLICATE FUNCTION BUG lines 29-50 & 53-74)
-- `phases/shared/_parser_function.py` - ISIN/name/quantity extraction from descriptions
+- `scripts/run_pipeline.py` - Main orchestration script
+- `src/data/state_manager.py` - Loads portfolio state
+- `src/pdf_parser/parser.py` - Core parsing logic
+- `config/adapter_registry.json` - Maps ISINs to Adapters
 - `.env` - API keys (ENSURE IN .gitignore - SECURITY CRITICAL)
 
-### Adapter Pattern (Phase 3)
-**Dispatcher**: `holdings_fetcher.py` routes ticker → adapter via `PROVIDER_ADAPTER_MAP`
+### Import System (CRITICAL)
 
-**Adapters**: Each in `phases/active/adapters/`
-- `ishares.py` - Layer 1 (direct CSV download) - ✅ PROVEN VIABLE
-- `xtrackers.py` - Layer 1 (direct download) - ✅ PROVEN VIABLE
-- `amundi.py` - Layer 3 (Selenium) - ⚠️ Incomplete/untested
-- `vaneck.py` - Layer 3 (Selenium) - ⚠️ Incomplete/untested
+**Module Execution Rule**: Python import system requires running scripts as modules from the project root.
+- **Correct**: `python -m scripts.run_pipeline`
+- **Incorrect**: `python scripts/run_pipeline.py` (Will cause `ModuleNotFoundError`)
 
-**Interface**: Each adapter exports `fetch_holdings(ticker: str) -> pd.DataFrame` with columns: `ticker`, `name`, `weight_percentage`
-
-### Database Schema
-**Securities Table**: `isin` (PK), `name`, `ticker`, `provider`, `asset_type`, `exchange`, `sector`, `links`, `price`, `last_updated`
-
-**Holdings Table**: `isin` (FK), `holding_ticker`, `holding_name`, `weight_percentage`, `last_updated`
-
-**Current State**: 14 securities, 0 holdings (empty - Phase 3 blocker)
-
-## Known Issues
-
-### Critical
-1. **Phase 3 Integration Blocker**: Spike scripts in `holdings_engine/` successfully download holdings, but production adapters in `phases/active/adapters/` don't populate database. Root cause: disconnect between proven spikes and production pipeline.
-2. **Duplicate Function**: `fetch_etf_holdings()` defined twice in `holdings_fetcher.py:29-50` and `:53-74`
-3. **No Tests**: Empty `tests/` directory despite `pytest` in requirements
-4. **Security**: Verify `.env` in `.gitignore` (contains real API keys)
-
-### Moderate
-5. **Untested Adapters**: Amundi and VanEck never validated with Inspector Spike
-6. **Documentation Conflicts**: Multiple competing plans (needs deprecation per feedback)
-7. **Incomplete Migration**: Root-level test files not in `tests/` directory
-
-## Import System (CRITICAL)
-
-**Single Entry Point Rule**: Python import system requires running from project root. All execution originates from `poc.py` at root level.
-
-**Correct sys.path Setup** (already in `poc.py`):
-```python
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
-```
-
-**DO NOT** run scripts from subdirectories - causes unsolvable import errors.
+**sys.path**: The `run.sh` script automatically sets `PYTHONPATH=.`.
 
 ## Web Scraping Strategy
 

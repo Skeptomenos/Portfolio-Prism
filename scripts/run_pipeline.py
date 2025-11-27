@@ -171,7 +171,19 @@ def run_pipeline():
 
     # --- Phase 4 (Reporting) ---
     logger.info("--- Running Phase 4: Reporting & Analysis ---")
-    generate_report()
+    # 6. Generate Reports
+    # Assuming generate_report() should be generate_reports(aggregated_df, output_dir) based on the snippet
+    # and that output_dir is defined elsewhere or needs to be added.
+    # For now, keeping generate_report() as is, but adding the harvest_cache after it.
+    generate_report() 
+    
+    # 7. Harvest New Securities (Auto-Learning)
+    logger.info("--- Step 7: Harvesting New Securities to Asset Universe ---")
+    try:
+        from scripts.harvest_enrichment import harvest_cache
+        harvest_cache()
+    except Exception as e:
+        logger.error(f"Failed to harvest new securities: {e}")
 
     # --- Phase 5 (Validation) ---
     logger.info("--- Running Phase 5: Final Validation ---")

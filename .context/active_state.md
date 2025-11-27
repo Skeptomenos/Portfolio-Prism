@@ -1,19 +1,23 @@
-# 🟢 Active Session State
-**Objective:** Awaiting Next Task
-**Status:** Stable / Idle
+# Active State
 
-## 🛡️ Applied Constraints
-- [Constraint: Packaging] - All code must run as an installed package. No `sys.path` hacks.
-- [Constraint: Currency] - All prices must be normalized to EUR immediately.
-- [Constraint: Data Authority] - Local `asset_universe.csv` is the source of truth for ISINs. API data must not overwrite valid local ISINs.
+## Current Objective
+**Monitoring & Verification**
+- Monitor the ongoing pipeline run (ISIN resolution via Wikidata).
+- Verify final report accuracy (Apple valuation).
+- Ensure auto-harvesting populates `asset_universe.csv`.
 
-## 📝 Plan & Progress
-- [x] 1. **Modernize:** Packaging, Config, Refactoring.
-- [x] 2. **Stabilize:** Fix Pricing (Currency), Aggregation (Numeric), and Naming (S&P 500).
-- [x] 3. **Fix:** Resolved Nvidia overvaluation (ISIN resolution priority).
-- [ ] 4. **Next:** User to define next objective.
+## Recent Accomplishments
+- **ISIN Resolution:** Implemented sophisticated Wikidata lookup (Name + Raw Ticker + Yahoo Ticker).
+- **Self-Learning:** Implemented Auto-Harvesting mechanism to save resolved ISINs locally.
+- **Data Integrity:** Fixed iShares adapter to preserve raw tickers.
+- **Documentation:** Updated System Flow, Learnings, Changelog, and Decision Log.
 
-## 🧠 Context & Learnings
-- **Structure is Destiny:** Proper packaging eliminates a whole class of import errors.
-- **Currency is Critical:** Never assume USD/EUR. always normalize.
-- **Trust Local Data:** External APIs can be incomplete. Don't let them overwrite your valid local data.
+## Active Constraints
+- **Data Authority:** Local `asset_universe.csv` is the single source of truth for ISINs.
+- **API Usage:** Wikidata is the primary ISIN source; Finnhub/YFinance for metadata only.
+- **Performance:** First run is slow (cache warming); subsequent runs must be fast.
+
+## Next Steps
+1. Wait for pipeline completion.
+2. Verify `outputs/true_exposure_report.csv`.
+3. Verify `config/asset_universe.csv` growth.

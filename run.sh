@@ -12,10 +12,11 @@ else
 fi
 
 echo "--- Portfolio Master Pipeline ---"
-echo "1. Running Database Setup (Parsing PDFs)..."
-python scripts/setup_db.py
+echo "1. Running Database Setup (Parsing PDFs - CSV Mode)..."
+# python -m scripts.setup_db_legacy
+python -m scripts.parse_pdfs_to_csv --mode add_new
 
 echo "2. Running Core Pipeline..."
-python scripts/run_pipeline.py
+python -m scripts.run_pipeline
 
 echo "--- Done ---"

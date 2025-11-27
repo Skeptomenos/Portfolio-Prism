@@ -32,7 +32,7 @@ This document provides instructions for AI agents operating in this repository.
 
 -   **Environment:** Use the existing `venv`. Activate with `source venv/bin/activate`.
 -   **Dependencies:** Install with `pip install -r requirements.txt`. A `requirements.txt` should be created with `pandas` and `pdfplumber`.
--   **Execution:** The main script is `main.py`.
+-   **Execution:** The main script is `scripts/run_pipeline.py` (executed via `./run.sh`).
 
 ## Debugging Methodology
 
@@ -78,7 +78,9 @@ This includes:
 
 This project follows a structured layout. Adhere to this structure for all file operations.
 
--   `src/`: Contains source code organized by functionality (adapters/, core/, data/, etc.).
+-   `src/`: Main source code (adapters, core, data, pdf_parser, utils).
+-   `config/`: Configuration files (JSON, CSV).
+-   `scripts/`: Executable scripts and entry points.
 -   `data/`: Contains input data (inputs/ for PDFs, database files).
 -   `outputs/`: For all generated output files.
 -   `debug/`: Contains debugging scripts and screenshots.

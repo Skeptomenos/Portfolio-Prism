@@ -1,5 +1,6 @@
 # Project Learnings (Telegraphic Knowledge Base)
 
+> **CRITICAL:** You must always append learnings, never replace or delete existing learnings.
 > **CRITICAL:** See `docs/agent/AI_CODING_DIRECTIVES.md` for Project Constitution (Mandates).
 
 ## 1. Applied Principles (Context)
@@ -76,6 +77,8 @@
 - **Cache Rot:** Changing parser logic without clearing `data/working/cache` leads to "Zombie Data". **Rule:** If parser logic changes, automated cache invalidation (or versioning) is required.
 - **Semantic Naming:** Distinct ISINs with identical Names (S&P 500 Dist vs Acc) cause debug confusion. **Rule:** Enforce distinct names in `asset_universe` for distinct ISINs.
 - **API Data Merging:** When enriching data from external APIs (e.g., Finnhub), prioritize locally resolved high-confidence data (like ISINs from `asset_universe.csv`) over potentially missing or incomplete API responses. Avoid blind overwrites.
+- **ISIN Resolution Reality:** Free APIs (Finnhub, YFinance) are unreliable for ISIN resolution (YFinance returns "NOT FOUND" for US stocks). **Wikidata** is a surprisingly robust, free alternative for ISIN lookup when combined with multi-signal validation (Name + Ticker).
+- **Self-Learning Systems (Harvesting):** Instead of manually maintaining a massive database, build a system that "learns" from its successful resolutions. The "Harvesting" pattern (Cache -> Validated Data -> Permanent Store) turns expensive API calls into one-time costs.
 
 ### 3.4. Data Modeling
 - **Ghost Assets:** Stale state -> **Clean Slate**: Wipe DB before run. State > Events.

@@ -118,4 +118,16 @@ The `enrichment.py` module was fetching data from the Finnhub API. However, for 
 
 ### Consequences
 *   **Reliability:** Prevents "regression by enrichment" where valid data is destroyed by incomplete API responses.
+
+## 2025-11-27: ISIN Resolution & Self-Learning (Phase 11.5)
+
+### Decision: Wikidata for ISIN Resolution
+**Context:** Free financial APIs (Finnhub, YFinance) failed to provide ISINs for major US stocks (Apple, Microsoft), causing massive overvaluation bugs due to failed aggregation. Paid APIs (Bloomberg) were out of scope.
+**Decision:** Use Wikidata as the primary source for ISIN resolution, implementing a "Sophisticated Lookup" strategy.
+**Rationale:** Wikidata is free, open, and contains ISINs for most public companies. By cross-referencing Company Name, Raw Ticker (from provider), and Yahoo Ticker, we achieve high-confidence matching (>95%) without external costs.
+
+### Decision: Auto-Harvesting (Self-Learning)
+**Context:** Resolving 1000+ ISINs via API on every run is slow (~1 hour) and wasteful. Manually populating `asset_universe.csv` is tedious.
+**Decision:** Implement an "Auto-Harvesting" mechanism that runs at the end of the pipeline.
+**Rationale:** Successfully resolved ISINs are automatically promoted from the temporary cache to the permanent `asset_universe.csv`. This turns the system into a self-learning engine: the more it runs, the faster and more robust it becomes, with zero manual effort.
 *   **Stability:** Fixes the Nvidia overvaluation bug permanently.

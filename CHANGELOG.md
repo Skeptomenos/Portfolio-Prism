@@ -8,6 +8,12 @@
 - **Asset Confusion**: Renamed "iShares Core S&P 500 ETF" variants in `asset_universe.csv` to explicitly distinguish between `(Acc)` and `(Dist)`, resolving duplicate entries.
 - **Cache Integrity:** Implemented `force_refresh` logic to ensure stale `N/A` values are purged when logic changes.
 - **Critical Bug Fix:** Resolved Nvidia overvaluation issue caused by Finnhub API overwriting locally resolved ISINs with `N/A`. Modified `enrichment.py` to preserve local ISINs.
+- **ISIN Resolution:** Fixed persistent ISIN loss for US stocks (Apple, Microsoft) by implementing a sophisticated Wikidata lookup strategy.
+- **Data Loss:** Fixed issue where iShares adapter dropped the raw ticker, making downstream resolution impossible.
+
+### Added
+- **Wikidata Integration:** Implemented `fetch_isin_from_wikidata` with multi-signal validation (Name + Raw Ticker + Yahoo Ticker) to reliably resolve ISINs without paid APIs.
+- **Auto-Harvesting:** Created `scripts/harvest_enrichment.py` and integrated it into the pipeline. The system now automatically saves successfully resolved ISINs to `asset_universe.csv`, making future runs instant.
 
 ---
 
