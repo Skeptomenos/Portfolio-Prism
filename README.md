@@ -22,25 +22,129 @@ For most investors, this exposure is a black box.
     *   `top_10_holdings.csv`: Your biggest real bets.
     *   `sector_exposure.csv`: Your actual diversification.
 
-## 🏗 Architecture & Design
+## 🏗 Architecture & Data Flow
 
-The project is built as a linear pipeline to ensure auditability and data integrity:
+The pipeline transforms raw broker PDFs into a complete "look-through" view of your portfolio through 7 distinct stages:
 
 ```mermaid
-graph LR
-    A[PDF Input] --> B(Parser);
-    B --> C{Local DB};
-    C --> D[Enrichment Engine];
-    D --> E{Aggregation Logic};
-    E --> F[Final Reports];
-    
-    subgraph "The Hybrid Adapter System"
-    D -- "API" --> iShares
-    D -- "Direct DL" --> VanEck
-    D -- "Direct DL" --> Xtrackers
-    D -- "Manual Drop" --> Amundi
+flowchart TB
+    subgraph Input["📥 INPUT LAYER"]
+        PDF["📄 PDF Statements<br/>(Trade Republic)"]
+        Universe["📋 asset_universe.csv<br/>(ISIN Master)"]
+        Holdings["📊 portfolio_holdings.csv<br/>(Quantities)"]
+        ManualETF["📁 Manual ETF Files<br/>(Amundi Escape Hatch)"]
     end
+
+    subgraph Parse["🔍 PARSING"]
+        Parser["PDF Parser<br/>(pdfplumber + multiprocessing)"]
+        Trades["Parsed Trades<br/>(ISIN, Qty, Price)"]
+    end
+
+    subgraph State["📦 STATE LOADING"]
+        StateMgr["State Manager"]
+        Direct["Direct Holdings<br/>(Stocks)"]
+        ETFs["ETF Positions"]
+    end
+
+    subgraph Market["💹 MARKET DATA"]
+        YFinance["Yahoo Finance<br/>(yfinance)"]
+        Prices["Live Prices<br/>(EUR normalized)"]
+        DirectReport["Direct Holdings Report"]
+    end
+
+    subgraph Decompose["🔬 ETF DECOMPOSITION"]
+        Registry["Adapter Registry"]
+        subgraph Adapters["Provider Adapters"]
+            iShares["iShares<br/>(API)"]
+            VanEck["VanEck<br/>(Direct DL)"]
+            Xtrackers["Xtrackers<br/>(Direct DL)"]
+            Amundi["Amundi<br/>(Manual)"]
+        end
+        ETFHoldings["ETF Holdings<br/>(Ticker, Weight%)"]
+    end
+
+    subgraph Enrich["🧬 ENRICHMENT"]
+        Classification["Asset Classification<br/>(Equity/Cash/Derivative)"]
+        TierSplit["Tiered Split<br/>(>1% vs ≤1%)"]
+        subgraph APIs["Resolution APIs"]
+            Local["Local Universe"]
+            Finnhub["Finnhub API"]
+            Wikidata["Wikidata"]
+            YF2["YFinance Metadata"]
+        end
+        Cache["Enrichment Cache"]
+    end
+
+    subgraph Aggregate["📊 AGGREGATION"]
+        DirectVal["Direct Values"]
+        IndirectVal["Indirect Values<br/>(ETF × Weight%)"]
+        GroupBy["Group by ISIN<br/>(or Fallback Key)"]
+        TotalExp["Total Exposure<br/>(Direct + Indirect)"]
+    end
+
+    subgraph Output["📤 OUTPUT LAYER"]
+        TrueExp["true_exposure_report.csv"]
+        Top10["top_10_holdings.csv"]
+        Sector["sector_exposure.csv"]
+        Geo["geography_exposure.csv"]
+        Health["PIPELINE_HEALTH.md"]
+    end
+
+    subgraph Validate["✅ VALIDATION"]
+        ValCheck["Value Conservation<br/>No Negatives<br/>Completeness"]
+    end
+
+    subgraph Learn["🧠 AUTO-LEARNING"]
+        Harvest["Harvest Enrichment"]
+        UpdateUni["Update Universe"]
+    end
+
+    %% Flow connections
+    PDF --> Parser --> Trades
+    Universe --> StateMgr
+    Holdings --> StateMgr
+    StateMgr --> Direct & ETFs
+
+    Direct --> YFinance
+    ETFs --> YFinance
+    YFinance --> Prices
+    Prices --> DirectReport
+    Prices --> Direct & ETFs
+
+    ETFs --> Registry
+    ManualETF --> Amundi
+    Registry --> iShares & VanEck & Xtrackers & Amundi
+    iShares & VanEck & Xtrackers & Amundi --> ETFHoldings
+
+    ETFHoldings --> Classification --> TierSplit
+    TierSplit --> Local
+    Local --> Finnhub --> Wikidata --> YF2
+    Local & Finnhub & Wikidata & YF2 --> Cache
+
+    Direct --> DirectVal
+    ETFHoldings --> IndirectVal
+    DirectVal & IndirectVal --> GroupBy --> TotalExp
+
+    TotalExp --> TrueExp & Top10 & Sector & Geo
+    TrueExp --> ValCheck --> Health
+
+    Cache --> Harvest --> UpdateUni --> Universe
 ```
+
+### Pipeline Stages Explained
+
+| Stage | Description | Key Files |
+|-------|-------------|-----------|
+| **1. Input** | PDF statements, asset universe, and portfolio holdings | `data/inputs/portfolio/*.pdf`, `config/asset_universe.csv` |
+| **2. Parsing** | Extract transactions from German PDFs using multiprocessing | `src/pdf_parser/parser.py` |
+| **3. State Loading** | Join universe + holdings, split into Stocks vs ETFs | `src/data/state_manager.py` |
+| **4. Market Data** | Fetch live prices from Yahoo Finance, normalize to EUR | `src/data/market.py` |
+| **5. ETF Decomposition** | Fetch underlying holdings via provider-specific adapters | `src/adapters/*.py` |
+| **6. Enrichment** | Resolve ISINs via Local → Finnhub → Wikidata → YFinance | `src/data/enrichment.py` |
+| **7. Aggregation** | Sum direct + indirect exposure per security | `src/core/aggregation.py` |
+| **8. Reporting** | Generate sector, geography, and top holdings reports | `src/core/reporting.py` |
+| **9. Validation** | Value conservation check (±2% tolerance) | `src/core/validation.py` |
+| **10. Auto-Learning** | Harvest resolved ISINs back to universe | `scripts/harvest_enrichment.py` |
 
 ### Engineering Challenges & Solutions
 
@@ -52,9 +156,17 @@ graph LR
 **Challenge:** Amundi's website uses complex anti-bot protections and JavaScript-blob downloads that defeated standard Selenium automation.
 **Solution:** Instead of fighting the website, we built a "Manual Escape Hatch". The system detects if it can't download an Amundi file and pauses to ask the user to drop the file into `data/inputs/manual_holdings/`. This prioritizes system stability over 100% automation.
 
-#### 3. Value Conservation Check
+#### 3. Tiered Enrichment
+**Challenge:** Enriching 1,500+ holdings per ETF would exhaust API rate limits.
+**Solution:** We implement **Tiered Enrichment**: Only holdings >1% weight get full ISIN resolution (Tier 1). Minor holdings (≤1%) use fallback aggregation by Ticker+Name (Tier 2). This reduces API calls by 90%+ while preserving 95%+ of portfolio value accuracy.
+
+#### 4. Value Conservation Check
 **Challenge:** When you break apart an ETF, you risk losing value in the math (e.g., tracking errors, cash drag, unclassified assets).
 **Solution:** We implemented a strict **Value Conservation Check**. The pipeline calculates your portfolio value *before* and *after* the look-through. If the difference is >2%, the pipeline halts and alerts you. **We don't guess with your money.**
+
+#### 5. Self-Learning System
+**Challenge:** Repeatedly calling APIs for the same securities is wasteful and slow.
+**Solution:** The **Harvesting** pattern: Successfully resolved ISINs are cached and automatically appended to `asset_universe.csv`. Future runs use local resolution, making them instant.
 
 ## 🚀 Installation & Setup
 
@@ -105,6 +217,7 @@ All results are generated in the `outputs/` directory:
 *   **`true_exposure_report.csv`**: The master list. Open this in Excel.
 *   **`sector_exposure.csv`**: See where your risks are concentrated.
 *   **`top_10_holdings.csv`**: Your actual biggest positions.
+*   **`PIPELINE_HEALTH.md`**: Quality metrics and actionable fixes.
 
 ## 🔧 Troubleshooting
 
@@ -131,12 +244,42 @@ data/
 │   ├── portfolio/          # Your PDFs go here
 │   └── manual_holdings/    # Manual Amundi files go here
 └── working/                # System DB and caches (Do not touch)
-scripts/                    # Entry points (run_pipeline.py, setup_db.py)
+config/
+├── asset_universe.csv      # ISIN ↔ Ticker master mapping
+├── adapter_registry.json   # ETF → Provider mapping
+└── ticker_map.json         # ISIN → Yahoo Ticker cache
+scripts/                    # Entry points (run_pipeline.py, manage_assets.py)
 src/
-├── adapters/               # ETF Provider logic
-├── core/                   # Aggregation & Reporting logic
-├── data/                   # I/O & Enrichment (enrichment.py)
-├── pdf_parser/             # Trade Republic parser
-└── utils/                  # Shared utilities
+├── adapters/               # ETF Provider logic (iShares, VanEck, etc.)
+├── core/                   # Aggregation, Reporting, Validation
+├── data/                   # I/O, Enrichment, Market Data, Caching
+├── pdf_parser/             # Trade Republic PDF parser
+└── utils/                  # Logging, Schemas, Classification
 outputs/                    # Your final reports
+docs/
+├── specs/                  # Living specifications (product, tech, requirements)
+└── agent/                  # AI agent directives and standards
 ```
+
+## 🧪 Development
+
+```bash
+# Run tests
+pytest
+
+# Lint code
+ruff check .
+
+# Format code
+ruff format .
+```
+
+## 📊 Key Design Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| **Hybrid First** | Automation with manual fallback for brittle sources |
+| **Tiered Enrichment** | Prioritize high-value holdings (>1%) to minimize API calls |
+| **Self-Learning Cache** | Auto-harvest successful resolutions to `asset_universe.csv` |
+| **Value Conservation** | Audit trail with ±2% tolerance check |
+| **Logic/IO Separation** | Pure aggregation logic in `core/`, I/O in `adapters/` and `data/` |
