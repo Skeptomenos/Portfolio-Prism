@@ -75,6 +75,9 @@ class XtrackersAdapter:
             else:
                 logger.info(f"   - Detected percentage weights (Sum={weight_sum:.2f}). No scaling needed.")
             
+            # Clip negative weights to 0.0 to ensure validation compliance
+            holdings_df['weight_percentage'] = holdings_df['weight_percentage'].clip(lower=0.0)
+            
             # Ensure ticker column exists (nullable in schema)
             if 'ticker' not in holdings_df.columns:
                 holdings_df['ticker'] = None
@@ -93,8 +96,10 @@ class XtrackersAdapter:
 
 # --- Example Usage (for testing) ---
 if __name__ == '__main__':
+    import os
     adapter = XtrackersAdapter()
-    xdem_holdings = adapter.fetch_holdings("XDEM")
+    # Use the ISIN for XDEM (Xtrackers MSCI World Momentum ETF)
+    xdem_holdings = adapter.fetch_holdings("IE00BL25JP72")
 
     if not xdem_holdings.empty:
         print("\n--- Successfully fetched XDEM holdings ---")

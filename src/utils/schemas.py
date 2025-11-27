@@ -17,7 +17,7 @@ class HoldingsSchema(pa.DataFrameModel):
     isin: Optional[Series[str]] = pa.Field(
         nullable=True
     )  # ISIN is optional (enriched later if missing)
-    weight_percentage: Series[float] = pa.Field(nullable=False)
+    weight_percentage: Series[float] = pa.Field(nullable=False, ge=0.0)
 
     class Config:
         strict = "filter"  # Drop columns not defined in the schema

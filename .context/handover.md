@@ -1,27 +1,34 @@
-# 🤝 Handover: Lint Compliance & Documentation
+# 🤝 Handover: Pydantic Integration Complete
 
 ## 🏁 Previous Session Summary
-Completed **Phase 12.5**: Lint Compliance & Documentation upgrade.
+Completed TASK-005 (Pydantic Schemas for Core Data Structures).
 
 **Accomplishments:**
-- **Ruff Installed:** `ruff 0.14.6` now available for linting.
-- **148 Lint Errors Fixed:** Reduced from 173 to 25 (85% reduction).
-- **README.md Rewritten:** Added comprehensive Mermaid flow diagram showing 10 pipeline stages.
-- **3 Commits Pushed:** Infrastructure → Lint Fixes → README update.
+- **TASK-005a:** Created `src/models/` package with Position, ETFHolding, ExposureRecord models.
+- **TASK-005b:** Integrated Position validation into `state_manager.py`.
+  - Added `_validate_positions()` for Pydantic validation
+  - Added `load_positions_as_models()` for typed Position objects
+  - Fixed NaN→None conversion with `_to_optional_str()` helper
+- **TASK-005c:** Integrated AggregatedExposure into `aggregation.py`.
+  - Replaced dict-based aggregation with `AggregatedExposure` model
+  - Uses `get_or_create_record()` and `add_indirect()` methods
+  - Final output via `to_dataframe()` with automatic portfolio % calculation
 
-## 📂 Key Files
-- `docs/specs/tasks.md`: Updated with completed tasks and new pending items.
-- `README.md`: Now contains detailed architecture documentation.
-- `CHANGELOG.md`: Phase 12.5 documented.
-- `docs/PROJECT_LEARNINGS.md`: 5 new lint-related learnings added.
+## 📂 Key Files Modified
+- `src/data/state_manager.py` - Added validation + model loader
+- `src/core/aggregation.py` - Uses AggregatedExposure model
+- `docs/specs/tasks.md` - Updated task status
 
-## ⚠️ Watchlist / Next Steps
-1. **TASK-004:** Run `scripts/migrate_db_to_csv.py` (script is fixed, ready to execute).
-2. **TASK-007:** Fix `test_validation_failure_negative_weight` test failure.
-3. **TASK-005:** Implement Pydantic schemas for core data structures.
-4. **TASK-008:** Add type hints to resolve type checker warnings.
+## ✅ Current Metrics
+- **Tests:** 9 passed (no regression)
+- **Lint:** Clean (ruff check/format passed)
+- **Type Checker Warnings:** ~25 pandas stub issues (expected, documented in PROJECT_LEARNINGS)
 
-## 📊 Current Metrics
-- **Ruff Errors:** 25 (all E402 - intentional)
-- **Tests:** 8 passed, 1 failed, 3 errors (API tests not pytest-compatible)
-- **Pipeline Health:** 100/100 (last run 2025-11-27)
+## ⚠️ Next Steps (Ready to Execute)
+1. **TASK-006:** Refactor `aggregation.py` into submodules:
+   - 006a: Extract `process_direct_holdings()` to `src/core/aggregation/direct.py`
+   - 006b: Extract classification logic to `src/core/aggregation/classification.py`
+   - 006c: Extract tiered enrichment to `src/core/aggregation/enrichment.py`
+   - 006d: Extract aggregation logic to `src/core/aggregation/grouping.py`
+   - 006e: Create clean public API in `__init__.py`
+2. **TASK-010:** Add integration tests
