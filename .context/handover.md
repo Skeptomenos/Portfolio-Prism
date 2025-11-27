@@ -1,24 +1,18 @@
-# 🤝 Handover: Nvidia Fix & Stability
+# 🤝 Handover: Infrastructure Upgrade
 
 ## 🏁 Previous Session Summary
-We successfully investigated and fixed a critical bug where Nvidia was vastly overvalued (~€33k vs ~€5k) in the `full_holdings.csv` report.
+We have successfully upgraded the AI Agent Infrastructure to the new **Spec-Driven & State-Aware (v3)** framework.
 
-**Root Cause:**
-The `enrichment.py` module was correctly identifying Nvidia's ISIN locally but then overwriting it with `N/A` from a Finnhub API response. This caused the holding to be treated as a "Ghost Asset" without an ISIN, breaking aggregation.
-
-**Fix Implemented:**
-- Modified `src/data/enrichment.py` to prioritize local ISINs from `asset_universe.csv`.
-- Added logic to only update ISIN from API if the API actually provides a value.
-
-**Verification:**
-- Ran full pipeline (`scripts/run_pipeline.py`).
-- Confirmed `outputs/true_exposure_report.csv` shows a single, correct Nvidia entry (~€5,088).
+**Accomplishments:**
+- **Specs Created:** Scaffolding complete for `docs/specs/` (`product.md`, `tech.md`, `requirements.md`, `tasks.md`).
+- **Directives Updated:** `docs/agent/GEMINI.md` rewritten as a "Bootloader" pointing to the authoritative `AI_CODING_DIRECTIVES.md`.
+- **Protocol Enforced:** New workflows for "Spec Check" and "Archival Rotation" are now mandatory.
 
 ## 📂 Key Files
-- `src/data/enrichment.py`: Contains the fix logic.
-- `src/core/aggregation.py`: Aggregation logic (cleaned of debug logs).
-- `outputs/true_exposure_report.csv`: Validated output.
+- `docs/specs/tasks.md`: **PRIMARY SOURCE OF TRUTH** for the next steps.
+- `docs/agent/GEMINI.md`: The new startup guide.
+- `.context/active_state.md`: Freshly reset for the next agent.
 
 ## ⚠️ Watchlist / Next Steps
-- **Monitor Enrichment:** Ensure other assets aren't missing metadata due to similar API issues.
-- **Asset Universe:** Keep `asset_universe.csv` up to date as the source of truth.
+1.  **Read `docs/specs/tasks.md`**: The previous agent left **TASK-003 (Migrate Legacy DB)** pending.
+2.  **Verify Pipeline**: Run the pipeline to ensure the infrastructure changes didn't break existing functionality.

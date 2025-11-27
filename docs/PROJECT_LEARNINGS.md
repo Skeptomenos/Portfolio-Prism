@@ -85,3 +85,7 @@
 - **ID Conflict:** Ticker (Price) vs ISIN (Holdings) -> **Relational**: `asset_universe` maps ISIN <-> Ticker.
 - **Weekend Pricing:** "Delisted" error -> **Escalation**: Try `1d` -> `5d` -> `1mo`.
 - **Inflation Bug:** 75% Nvidia -> **Audit**: Divide % by 100. Verify against "Direct Holdings" baseline.
+
+### Phase 12: Spec-Driven Architecture (2025-11-27)
+- **Document Drift:** Documentation naturally drifts from code unless structurally enforced. **Solution:** Use a "Bootloader" (`docs/agent/GEMINI.md`) that acts as a pointer to the authoritative Directives (`docs/agent/AI_CODING_DIRECTIVES.md`) rather than duplicating them.
+- **State Persistence:** Ephemeral logs are lost. **Solution:** Mandate "Archival Rotation" of the active state file to a history folder at the end of every session.

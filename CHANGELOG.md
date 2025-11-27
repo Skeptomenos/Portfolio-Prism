@@ -1,5 +1,19 @@
 # Changelog
 
+## [Phase 12] - 2025-11-27
+
+### Changed
+- **Directives & Standards**: Updated `@docs/agent/AI_CODING_DIRECTIVES.md` and `@docs/agent/CODING_STANDARDS.md` to `v3` (Spec-Driven & State-Aware).
+- **Agent Protocol**: Rewrote `docs/agent/GEMINI.md` to act as a lightweight "Bootloader" that enforces reading the new Directives.
+- **Documentation Architecture**: Transitioned from ephemeral "Plans" to living "Specifications".
+    - Added `docs/specs/product.md`
+    - Added `docs/specs/tech.md`
+    - Added `docs/specs/requirements.md`
+    - Added `docs/specs/tasks.md`
+
+### Added
+- **Spec-Driven Workflow**: Implemented strict phases for Spec Check, Recursive Decomposition, and Archival Rotation.
+
 ## [Phase 11.5] - 2025-11-25
 
 ### Fixed

@@ -1,23 +1,16 @@
-# Active State
+# 🟢 Active Session State
+**Objective:** Fix "Vertex Claude 4.5" error by routing through LiteLLM.
+**Status:** Build
 
-## Current Objective
-**Monitoring & Verification**
-- Monitor the ongoing pipeline run (ISIN resolution via Wikidata).
-- Verify final report accuracy (Apple valuation).
-- Ensure auto-harvesting populates `asset_universe.csv`.
+## 🛡️ Applied Constraints
+- Logic/IO Separation (Config isolation)
+- Zero Trust (Validate config)
 
-## Recent Accomplishments
-- **ISIN Resolution:** Implemented sophisticated Wikidata lookup (Name + Raw Ticker + Yahoo Ticker).
-- **Self-Learning:** Implemented Auto-Harvesting mechanism to save resolved ISINs locally.
-- **Data Integrity:** Fixed iShares adapter to preserve raw tickers.
-- **Documentation:** Updated System Flow, Learnings, Changelog, and Decision Log.
+## 📝 Current Focus
+- **Phase:** Phase 2: Build & Implement
+- **Ref:** `opencode.json`
 
-## Active Constraints
-- **Data Authority:** Local `asset_universe.csv` is the single source of truth for ISINs.
-- **API Usage:** Wikidata is the primary ISIN source; Finnhub/YFinance for metadata only.
-- **Performance:** First run is slow (cache warming); subsequent runs must be fast.
-
-## Next Steps
-1. Wait for pipeline completion.
-2. Verify `outputs/true_exposure_report.csv`.
-3. Verify `config/asset_universe.csv` growth.
+## 🧠 Context & Learnings
+- **Configuration Switch:** Switched from direct `vertex` provider (broken) to `litellm` proxy (OpenAI compatible).
+- **Model ID:** Using `vertex_ai/claude-opus-4-5` as defined in LiteLLM params.
+- **Port:** Assumed default `http://localhost:4000`. User must ensure LiteLLM is running.
