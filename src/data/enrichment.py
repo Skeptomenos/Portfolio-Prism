@@ -1,4 +1,3 @@
-import json
 import os
 import requests
 import time
@@ -8,6 +7,7 @@ from dotenv import load_dotenv
 
 
 from src.data.caching import load_from_cache, save_to_cache, get_cache_key
+from src.utils.validation import is_valid_isin
 from src.config import ASSET_UNIVERSE_PATH
 import pandas as pd
 
@@ -46,25 +46,25 @@ def fetch_from_yfinance(identifier: str) -> Optional[Dict[str, str]]:
     return None
 
 
-def fetch_isin_from_wikidata(company_name: str, raw_ticker: str = None, yahoo_ticker: str = None) -> Optional[str]:
+def fetch_isin_from_wikidata(
+    company_name: str, raw_ticker: str = None, yahoo_ticker: str = None
+) -> Optional[str]:
     """
     Sophisticated ISIN lookup using Wikidata with multi-signal validation.
-    
+
     Uses company name, raw ticker (from provider), and Yahoo ticker to find and validate
     the correct entity, then extracts the ISIN.
-    
+
     Args:
         company_name: The company name to search for
         raw_ticker: Raw ticker from ETF provider (e.g., "AAPL" from iShares)
         yahoo_ticker: Yahoo Finance compatible ticker (e.g., "AAPL" or "ALV.DE")
-    
+
     Returns:
         ISIN string or None if not found
     """
-    headers = {
-        "User-Agent": "PortfolioAnalyzer/1.0 (Educational Python Project)"
-    }
-    
+    headers = {"User-Agent": "PortfolioAnalyzer/1.0 (Educational Python Project)"}
+
     def search_wikidata(query):
         """Search for entities matching the query."""
         url = "https://www.wikidata.org/w/api.php"
@@ -73,7 +73,7 @@ def fetch_isin_from_wikidata(company_name: str, raw_ticker: str = None, yahoo_ti
             "search": query,
             "language": "en",
             "format": "json",
-            "limit": 5
+            "limit": 5,
         }
         try:
             resp = requests.get(url, params=params, headers=headers, timeout=10)
@@ -90,7 +90,7 @@ def fetch_isin_from_wikidata(company_name: str, raw_ticker: str = None, yahoo_ti
             "action": "wbgetentities",
             "ids": entity_id,
             "props": "claims|labels|aliases",
-            "format": "json"
+            "format": "json",
         }
         try:
             resp = requests.get(url, params=params, headers=headers, timeout=10)
@@ -119,43 +119,45 @@ def fetch_isin_from_wikidata(company_name: str, raw_ticker: str = None, yahoo_ti
         return tickers
 
     try:
-        logger.debug(f"Wikidata lookup: {company_name} | Raw: {raw_ticker} | Yahoo: {yahoo_ticker}")
-        
+        logger.debug(
+            f"Wikidata lookup: {company_name} | Raw: {raw_ticker} | Yahoo: {yahoo_ticker}"
+        )
+
         # Strategy 1: Search by company name
         results = search_wikidata(company_name)
-        
+
         for result in results:
             entity_id = result["id"]
             details = get_entity_details(entity_id)
-            
+
             # Extract ISIN and tickers
             isin = extract_isin(details)
             found_tickers = extract_tickers(details)
-            
+
             # Validation scoring
             match_score = 0
-            
+
             # Score 1: Has ISIN
             if isin:
                 match_score += 1
-            
+
             # Score 2: Raw ticker matches (strong signal)
             if raw_ticker and raw_ticker in found_tickers:
                 logger.debug(f"  ✓ Raw ticker match: {raw_ticker}")
                 match_score += 2
-            
+
             # Score 1: Yahoo ticker base matches
             if yahoo_ticker:
-                base_yahoo = yahoo_ticker.split('.')[0]
+                base_yahoo = yahoo_ticker.split(".")[0]
                 if base_yahoo in found_tickers:
                     logger.debug(f"  ✓ Yahoo ticker base match: {base_yahoo}")
                     match_score += 1
-            
+
             # Accept if we have ISIN and at least one ticker match, or just ISIN with high confidence
             if match_score >= 2 or (isin and match_score >= 1):
                 logger.info(f"✓ ISIN for {company_name}: {isin} [Wikidata]")
                 return isin
-        
+
         # If name search failed and we have a raw ticker, try searching by ticker
         if raw_ticker and not results:
             logger.debug(f"Retrying with raw ticker: {raw_ticker}")
@@ -165,12 +167,14 @@ def fetch_isin_from_wikidata(company_name: str, raw_ticker: str = None, yahoo_ti
                 details = get_entity_details(entity_id)
                 isin = extract_isin(details)
                 if isin:
-                    logger.info(f"✓ ISIN for {company_name}: {isin} [Wikidata via ticker]")
+                    logger.info(
+                        f"✓ ISIN for {company_name}: {isin} [Wikidata via ticker]"
+                    )
                     return isin
-        
+
         logger.warning(f"✗ No ISIN found for {company_name} in Wikidata")
         return None
-        
+
     except Exception as e:
         logger.debug(f"Wikidata lookup failed for {company_name}: {e}")
         return None
@@ -224,8 +228,7 @@ def enrich_securities_bulk(
 
     # Counter for progress feedback
     count = 0
-    total = len(securities_to_fetch)
-    print(f"  - Progress: ", end="", flush=True)
+    print("  - Progress: ", end="", flush=True)
 
     for security in securities_to_fetch:
         identifier = security.get("ticker") or security.get("isin")
@@ -240,16 +243,22 @@ def enrich_securities_bulk(
         ):
             continue
 
+        # NEW: Check if the identifier is ALREADY an ISIN
+        # If so, we don't need to "resolve" it, just enrich metadata
+        is_isin = is_valid_isin(identifier)
+
         cache_key = get_cache_key(identifier)
 
         # 1. Check cache first
         if not force_refresh:
             cached_data = load_from_cache(cache_key)
             if cached_data:
-                # Simple validation: if cached data is "Unknown", treat as cache miss to try fallback
+                # Validation: cache hit only if we have valid sector, geography, AND ISIN
+                # This ensures we re-enrich securities that previously failed ISIN resolution
                 if (
                     cached_data.get("sector") != "Unknown"
                     and cached_data.get("geography") != "Unknown"
+                    and cached_data.get("isin") not in (None, "N/A", "")
                 ):
                     enriched_results.append(cached_data)
                     # Visual feedback for cache hit
@@ -260,12 +269,12 @@ def enrich_securities_bulk(
         # 2. If not in cache or force_refresh is True, call the API
         result = {
             "ticker": identifier,
-            "isin": "N/A",
+            "isin": identifier if is_isin else "N/A",
             "name": "Not Found",
             "sector": "Unknown",
             "geography": "Unknown",
         }
-        
+
         # Preserve raw_ticker if provided
         if security.get("raw_ticker"):
             result["raw_ticker"] = security.get("raw_ticker")
@@ -304,7 +313,9 @@ def enrich_securities_bulk(
                         # Only overwrite ISIN if Finnhub provides a valid one
                         if finnhub_isin:
                             result["isin"] = finnhub_isin
-                            logger.debug(f"ISIN for {identifier}: {finnhub_isin} [Finnhub]")
+                            logger.debug(
+                                f"ISIN for {identifier}: {finnhub_isin} [Finnhub]"
+                            )
                         # Visual feedback for API hit
                         print("F", end="", flush=True)  # F for Finnhub
                     else:
@@ -318,23 +329,25 @@ def enrich_securities_bulk(
                 print("x", end="", flush=True)
 
         # NEW: Wikidata ISIN Fallback (if still N/A after Finnhub)
-        if result["isin"] == "N/A" and result.get("name") != "Not Found":
+        # Only run if we don't already have a valid ISIN
+        if (
+            result["isin"] == "N/A"
+            and result.get("name") != "Not Found"
+            and not is_isin
+        ):
             try:
-                # Extract raw_ticker if available (from provider CSV)
-                raw_ticker = security.get("raw_ticker")
-                
                 wikidata_isin = fetch_isin_from_wikidata(
                     company_name=result["name"],
-                    raw_ticker=raw_ticker,
-                    yahoo_ticker=identifier  # identifier is the Yahoo-compatible ticker
+                    ticker=identifier,
+                    yahoo_ticker=identifier,  # identifier is the Yahoo-compatible ticker
                 )
-                
+
                 if wikidata_isin:
                     result["isin"] = wikidata_isin
                     print("W", end="", flush=True)  # W for Wikidata ISIN resolution
                 else:
                     logger.warning(f"✗ No ISIN for {identifier} from Wikidata")
-                    
+
             except Exception as e:
                 logger.debug(f"Wikidata ISIN lookup failed for {identifier}: {e}")
 
@@ -347,7 +360,9 @@ def enrich_securities_bulk(
 
         # Log final ISIN status
         if result["isin"] == "N/A":
-            logger.error(f"⚠ FAILED to resolve ISIN for {identifier} after all attempts")
+            logger.error(
+                f"⚠ FAILED to resolve ISIN for {identifier} after all attempts"
+            )
 
         # 3. Save to cache and append to results
         save_to_cache(cache_key, result)
@@ -377,5 +392,5 @@ def enrich_securities(
     """
     print(f"  - Enriching metadata for {len(securities)} securities...")
     enriched_data = enrich_securities_bulk(securities, force_refresh=force_refresh)
-    print(f"  - Enrichment complete.")
+    print("  - Enrichment complete.")
     return enriched_data

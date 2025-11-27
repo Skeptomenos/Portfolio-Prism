@@ -1,6 +1,4 @@
 import pandas as pd
-import yfinance as yf
-import time
 import os
 from src.utils.logging_config import get_logger
 
@@ -126,7 +124,7 @@ def migrate():
     df_universe.to_csv(OUTPUT_UNIVERSE, index=False)
     df_holdings.to_csv(OUTPUT_HOLDINGS, index=False)
     
-    logger.info(f"--- Migration Complete ---")
+    logger.info("--- Migration Complete ---")
     logger.info(f"Created {OUTPUT_UNIVERSE} with {len(df_universe)} assets.")
     logger.info(f"Created {OUTPUT_HOLDINGS} with {len(df_holdings)} positions.")
 

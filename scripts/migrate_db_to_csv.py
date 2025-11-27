@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-One-time migration: portfolio.db → portfolio_holdings.csv
+One-time migration: portfolio.db -> portfolio_holdings.csv
 
 Safely merge SQLite positions into CSV format.
 """
@@ -9,134 +9,144 @@ import pandas as pd
 from pathlib import Path
 import shutil
 from datetime import datetime
-import argparse
+import sys
 
-DB_PATH = Path("data/working/database/portfolio.db")
-CSV_PATH = Path("data/true_data/portfolio_holdings.csv")
+# Add project root to path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
+DB_PATH = PROJECT_ROOT / "data/working/database/portfolio.db"
+CSV_PATH = PROJECT_ROOT / "data/true_data/portfolio_holdings.csv"
+
 
 def check_status():
     """Analyze current state."""
     db_exists = DB_PATH.exists()
     csv_exists = CSV_PATH.exists()
-    
+
     print("=== Migration Status ===")
-    print(f"SQLite DB: {'✓ Found' if db_exists else '✗ Not found'}")
+    status_db = "[OK] Found" if db_exists else "[X] Not found"
+    print(f"SQLite DB: {status_db}")
     if db_exists:
         db_stat = DB_PATH.stat()
+        print(f"  Path: {DB_PATH}")
         print(f"  Size: {db_stat.st_size / 1024:.1f} KB")
         print(f"  Modified: {datetime.fromtimestamp(db_stat.st_mtime):%Y-%m-%d %H:%M}")
-        
-        # Count records
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            count = pd.read_sql_query("SELECT COUNT(*) as count FROM positions", conn).iloc[0]['count']
-            conn.close()
-            print(f"  Records: {count}")
-        except Exception as e:
-            print(f"  Records: Error - {e}")
-    
-    print(f"\nCSV File: {'✓ Found' if csv_exists else '✗ Not found'}")
+
+    status_csv = "[OK] Found" if csv_exists else "[X] Not found"
+    print(f"CSV File: {status_csv}")
     if csv_exists:
         csv_stat = CSV_PATH.stat()
+        print(f"  Path: {CSV_PATH}")
         print(f"  Size: {csv_stat.st_size} bytes")
         print(f"  Modified: {datetime.fromtimestamp(csv_stat.st_mtime):%Y-%m-%d %H:%M}")
-        
-        # Count records
-        try:
-            df = pd.read_csv(CSV_PATH)
-            print(f"  Records: {len(df)}")
-        except Exception as e:
-            print(f"  Records: Error - {e}")
-    
+
     return db_exists, csv_exists
+
 
 def load_db_positions():
     """Load positions from SQLite."""
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(
-        "SELECT ISIN, total_quantity FROM positions",
-        conn
-    )
-    conn.close()
-    
+    try:
+        df = pd.read_sql_query(
+            "SELECT ISIN, total_quantity FROM positions",
+            conn
+        )
+    except Exception as e:
+        print(f"Error reading DB: {e}")
+        return pd.DataFrame()
+    finally:
+        conn.close()
+
     # Rename to match CSV schema
-    df.columns = ['ISIN', 'Quantity']
+    df.columns = ["ISIN", "Quantity"]
     return df
 
-def migrate(mode='merge'):
+
+def migrate(mode="merge"):
     """
     Migrate DB to CSV.
-    
+
     Args:
         mode: 'merge' (combine), 'overwrite' (replace CSV), or 'skip' (keep CSV)
     """
     db_exists, csv_exists = check_status()
-    
+
     if not db_exists:
-        print("\n✓ No database found - migration not needed")
+        print("\n[OK] No database found - migration not needed")
         return
-    
+
     # Load DB data
-    print("\n📊 Loading database positions...")
     db_df = load_db_positions()
-    print(f"   Found {len(db_df)} positions in database")
-    
+    if db_df.empty:
+        print("\n[WARN] Database is empty or unreadable.")
+        return
+
+    print(f"\n[INFO] Found {len(db_df)} positions in database")
+
     if not csv_exists:
-        print("\n→ CSV doesn't exist, creating from DB...")
+        print("-> CSV does not exist, creating from DB...")
         CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
         db_df.to_csv(CSV_PATH, index=False)
-        print(f"✓ Created {CSV_PATH}")
-    
+        print(f"[OK] Created {CSV_PATH}")
+
     else:
         # CSV exists - merge strategy
-        csv_df = pd.read_csv(CSV_PATH)
-        print(f"📊 Found {len(csv_df)} positions in CSV")
-        
-        if mode == 'skip':
-            print("\n→ Skipping migration (keeping CSV)")
+        try:
+            csv_df = pd.read_csv(CSV_PATH)
+            print(f"[INFO] Found {len(csv_df)} positions in CSV")
+        except Exception as e:
+            print(f"[WARN] Error reading existing CSV: {e}")
+            csv_df = pd.DataFrame(columns=["ISIN", "Quantity"])
+
+        if mode == "skip":
+            print("-> Skipping migration (keeping CSV)")
             return
-        
-        elif mode == 'overwrite':
+
+        elif mode == "overwrite":
             # Backup CSV
-            backup_path = CSV_PATH.with_suffix(f'.csv.backup.{datetime.now():%Y%m%d_%H%M%S}')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = CSV_PATH.with_suffix(f".csv.backup.{timestamp}")
             shutil.copy(CSV_PATH, backup_path)
-            print(f"\n📦 Backed up CSV to {backup_path.name}")
-            
+            print(f"[BACKUP] Backed up CSV to {backup_path}")
+
             # Overwrite
             db_df.to_csv(CSV_PATH, index=False)
-            print(f"✓ Overwrote CSV with DB data ({len(db_df)} positions)")
-        
+            print("[OK] Overwrote CSV with DB data")
+
         else:  # merge
             # Merge: DB takes precedence for common ISINs
-            merged_df = pd.concat([csv_df, db_df]).drop_duplicates(subset=['ISIN'], keep='last')
-            
+            # We concat, then drop duplicates keeping the LAST occurrence.
+            # So if we want DB to win, we put DB last.
+            merged_df = pd.concat([csv_df, db_df])
+            # If duplicates exist in ISIN, keep the one from DB (which is at the bottom)
+            merged_df = merged_df.drop_duplicates(subset=["ISIN"], keep="last")
+
             # Backup CSV
-            backup_path = CSV_PATH.with_suffix(f'.csv.backup.{datetime.now():%Y%m%d_%H%M%S}')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = CSV_PATH.with_suffix(f".csv.backup.{timestamp}")
             shutil.copy(CSV_PATH, backup_path)
-            print(f"\n📦 Backed up CSV to {backup_path.name}")
-            
+            print(f"[BACKUP] Backed up CSV to {backup_path}")
+
             # Save merged
             merged_df.to_csv(CSV_PATH, index=False)
-            print(f"✓ Merged: {len(merged_df)} total positions")
-            print(f"  (CSV had {len(csv_df)}, DB had {len(db_df)})")
-    
+            print(f"[OK] Merged: {len(merged_df)} total positions")
+
     # Backup DB
-    backup_db = DB_PATH.with_suffix('.db.backup')
-    if not backup_db.exists():
-        shutil.copy(DB_PATH, backup_db)
-        print(f"📦 Backed up DB to {backup_db.name}")
-    else:
-        print(f"📦 DB backup already exists: {backup_db.name}")
-    
-    print("\n✅ Migration complete!")
+    backup_db = DB_PATH.with_suffix(".db.backup")
+    shutil.copy(DB_PATH, backup_db)
+    print(f"[BACKUP] Backed up DB to {backup_db}")
+    print("\n[DONE] Migration complete!")
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Migrate portfolio.db to CSV')
-    parser.add_argument('--mode', choices=['merge', 'overwrite', 'skip', 'status'],
-                       default='status', help='Migration mode')
+    import argparse
+    parser = argparse.ArgumentParser(description="Migrate portfolio.db to CSV")
+    parser.add_argument("--mode", choices=["merge", "overwrite", "skip", "status"],
+                        default="status", help="Migration mode")
     args = parser.parse_args()
-    
-    if args.mode == 'status':
+
+    if args.mode == "status":
         check_status()
     else:
         migrate(mode=args.mode)

@@ -1,7 +1,6 @@
 # phases/active/holdings_fetcher.py
 import os
 import json
-import pandas as pd
 from datetime import datetime
 
 # Add the project root to the Python path

@@ -186,7 +186,7 @@ def sync_map():
     with open(TICKER_MAP_PATH, 'w') as f:
         json.dump(ticker_map, f, indent=4)
         
-    print(f"\n✅ Sync complete:")
+    print("\n✅ Sync complete:")
     print(f"   {added} added, {updated} updated, {original_count - added - updated} unchanged")
     print(f"   Total: {len(ticker_map)} tickers")
 

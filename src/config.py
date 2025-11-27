@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 # Base project directory (2 levels up from src/config.py)

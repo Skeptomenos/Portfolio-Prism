@@ -1,5 +1,4 @@
 import pandas as pd
-import sys
 
 try:
     df = pd.read_csv('outputs/true_exposure_report.csv')

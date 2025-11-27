@@ -26,7 +26,7 @@ def validate_final_report(positions_df: pd.DataFrame, report_df: pd.DataFrame) -
     # 2. Cash Drag: Cash components in ETFs often not listed in holdings.
     # 3. Rounding: Weight percentages often truncated to 2 decimals.
     if not np.isclose(initial_total_value, final_total_value, rtol=0.02):
-        print(f"  - ❌ FAILED: Value Conservation Check")
+        print("  - ❌ FAILED: Value Conservation Check")
         print(f"    - Initial total market value: €{initial_total_value:,.2f}")
         print(f"    - Final total exposure value: €{final_total_value:,.2f}")
         print(f"    - Difference: €{final_total_value - initial_total_value:,.2f}")
@@ -36,7 +36,7 @@ def validate_final_report(positions_df: pd.DataFrame, report_df: pd.DataFrame) -
 
     # 2. No Negative Exposures Check
     if (report_df[['direct', 'indirect', 'total_exposure']] < 0).any().any():
-        print(f"  - ❌ FAILED: Negative Exposures Check")
+        print("  - ❌ FAILED: Negative Exposures Check")
         print("    - Found negative values in one of the exposure columns.")
         is_valid = False
     else:
@@ -54,7 +54,7 @@ def validate_final_report(positions_df: pd.DataFrame, report_df: pd.DataFrame) -
         missing_direct = initial_direct_isins - report_isins
         
         if missing_direct:
-            print(f"  - ❌ FAILED: Completeness Check")
+            print("  - ❌ FAILED: Completeness Check")
             print(f"    - Missing Direct Holdings in report: {missing_direct}")
             is_valid = False
         else:

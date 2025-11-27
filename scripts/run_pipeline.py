@@ -1,7 +1,5 @@
 # main.py
 import pandas as pd
-import sys
-import os
 from dotenv import load_dotenv, find_dotenv
 
 # Load environment variables from .env file
@@ -20,8 +18,9 @@ from src.utils.schemas import HoldingsSchema
 from src.core.direct_reporting import generate_direct_holdings_report
 import pandera as pa
 from datetime import datetime
-from scripts.update_registry import update_registry_interactive
 from src.utils.metrics import tracker
+from src.core.health import health
+from src.data.enrichment import load_asset_universe
 
 logger = get_logger(__name__)
 
@@ -32,7 +31,7 @@ def generate_quality_report(failed_etfs: list, output_path: str):
         return
 
     with open(output_path, 'w') as f:
-        f.write(f"--- Data Quality Report ---\n")
+        f.write("--- Data Quality Report ---\n")
         f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write("The following ETFs could not be processed and were EXCLUDED from the calculation:\n")
         for isin, reason in failed_etfs:
@@ -71,6 +70,37 @@ def run_pipeline():
         logger.warning("--- Pipeline Halted: No positions found in the portfolio state. ---")
         tracker.save("outputs/pipeline_metrics.json")
         return
+
+    # --- HEALTH CHECK: Inputs ---
+    health.reset()
+    health.record_metric("direct_holdings", len(direct_positions), "set")
+    health.record_metric("etf_positions", len(etf_positions), "set")
+    
+    # Check Unmapped Direct Holdings
+    try:
+        universe_mapping = load_asset_universe()
+        # asset_universe keys are usually Tickers or ISINs? 
+        # load_asset_universe returns {ticker: isin} or {isin: metadata}?
+        # Actually it returns {ticker: isin}. 
+        # But direct_positions has 'isin'. 
+        # We should check if the ISIN exists in the universe values?
+        # Or if the TICKER exists in the keys?
+        # Direct positions usually have ISIN.
+        # Let's check if ISIN is known.
+        known_isins = set(universe_mapping.values())
+        
+        for _, row in direct_positions.iterrows():
+            isin = row.get('isin')
+            if isin and isin not in known_isins:
+                 health.record_failure(
+                     stage="DIRECT_HOLDINGS",
+                     item=isin,
+                     error="Direct holding ISIN not found in asset_universe",
+                     fix=f"Add {isin} to config/asset_universe.csv",
+                     severity="MEDIUM"
+                 )
+    except Exception as e:
+        logger.warning(f"Health check failed: {e}")
 
     # --- Setup Adapter Registry (after potential updates) ---
     adapter_registry = AdapterRegistry()
@@ -132,16 +162,27 @@ def run_pipeline():
             if not adapter:
                 failed_etfs.append((isin, "No adapter registered for this ISIN."))
                 tracker.increment_system_metric("etfs_failed")
+                health.record_etf_stat(isin, 0, 0.0, "NO_ADAPTER")
+                health.record_failure("ETF_DECOMPOSITION", isin, "No adapter found", "Update src/adapters/registry.py", "HIGH")
                 continue
             
             tracker.increment_system_metric("etfs_with_adapter")
 
             # 2. Fetch Data
             holdings = adapter.fetch_holdings(isin)
-            if holdings.empty:
+            
+            # HEALTH CHECK: ETF Stats
+            if not holdings.empty:
+                count = len(holdings)
+                weight_sum = holdings['weight_percentage'].sum() if 'weight_percentage' in holdings.columns else 0.0
+                health.record_etf_stat(isin, count, weight_sum, "OK")
+                health.record_metric("etfs_processed", 1)
+            else:
+                health.record_etf_stat(isin, 0, 0.0, "EMPTY")
+                health.record_failure("ETF_DECOMPOSITION", isin, "Returned empty holdings", "Check provider website or file", "HIGH")
                 failed_etfs.append((isin, "Adapter returned no data."))
                 tracker.increment_system_metric("etfs_failed")
-                continue
+                continue # Continue if holdings are empty, no further processing for this ETF
 
             # 3. Validate Data
             holdings = HoldingsSchema.validate(holdings)
@@ -169,9 +210,14 @@ def run_pipeline():
         tracker.save("outputs/pipeline_metrics.json")
         return
 
-    # --- Phase 4 (Reporting) ---
-    logger.info("--- Running Phase 4: Reporting & Analysis ---")
-    # 6. Generate Reports
+    # --- Finalize and Formatting Output ---
+    logger.info("--- Finalizing and Formatting Output ---")
+    
+    # Save Health Report
+    health.save_artifacts()
+    print("\n" + health.generate_report())
+    
+    logger.info("--- Pipeline Complete. ---")
     # Assuming generate_report() should be generate_reports(aggregated_df, output_dir) based on the snippet
     # and that output_dir is defined elsewhere or needs to be added.
     # For now, keeping generate_report() as is, but adding the harvest_cache after it.

@@ -13,7 +13,6 @@ Usage:
     python scripts/parse_pdfs_to_csv.py --mode add_new   # Add new positions only (default)
     python scripts/parse_pdfs_to_csv.py --mode merge     # Update quantities (use with caution)
 """
-import sys
 import pandas as pd
 from pathlib import Path
 from datetime import datetime

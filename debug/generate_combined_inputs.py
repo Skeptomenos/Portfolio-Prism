@@ -1,4 +1,3 @@
-import sys
 
 # Order based on typical SQL sort or observed behavior
 SORTED_ALL_ISINS = [

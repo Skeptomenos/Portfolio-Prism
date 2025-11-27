@@ -2,21 +2,33 @@ import argparse
 import pandas as pd
 from pathlib import Path
 import pdfplumber
-import sys
 import os
 import hashlib
 import multiprocessing
-from functools import partial
 from src.pdf_parser.utils import parse_description
 from deep_translator import GoogleTranslator
 from tqdm import tqdm
-# NOTE: database.py was deleted in Phase 1 (legacy SQLite workflow)
-# The parse_pdfs_from_folder() function doesn't need database imports
-# from src.data.database import (
-#     is_file_processed,
-#     mark_file_processed,
-#     insert_trades_ignore_duplicates,
-# )
+# NOTE: database.py was deleted in Phase 11 (legacy SQLite workflow removed)
+# The parse_pdfs_from_folder() function doesn't need database imports.
+# Stubs below are provided for main() which is deprecated but kept for reference.
+
+
+def is_file_processed(file_hash: str) -> bool:
+    """Stub for removed database function. Always returns False."""
+    # In CSV workflow, we don't track processed files in DB
+    return False
+
+
+def mark_file_processed(file_hash: str, filename: str) -> None:
+    """Stub for removed database function. No-op."""
+    pass
+
+
+def insert_trades_ignore_duplicates(df) -> int:
+    """Stub for removed database function. Returns 0."""
+    # In CSV workflow, we just write to CSV directly
+    return 0
+
 
 # Translation mappings
 HEADER_MAPPING = {
@@ -142,9 +154,8 @@ def parse_transaction_amount(row):
             except ValueError:
                 amount = 0.0
         # Determine direction
-        if (
-            typ in ["INTEREST_PAYMENT", "DIVIDENDS", "PREMIUM"]
-            or "Incoming" in str(besch)
+        if typ in ["INTEREST_PAYMENT", "DIVIDENDS", "PREMIUM"] or "Incoming" in str(
+            besch
         ):
             pass  # positive
         elif typ in ["CARD_TRANSACTION", "TRANSFER"] or "Outgoing" in str(besch):
@@ -228,7 +239,7 @@ def process_single_page(args):
                 "CARD_TRANSACTION",
                 "TRANSFER",
             ]
-            
+
             # Filter transactions
             if "TYPE" in transactions_df.columns:
                 transactions_df = transactions_df[
@@ -242,7 +253,6 @@ def process_single_page(args):
             else:
                 transactions_df = pd.DataFrame()
 
-
             # Process Trades
             trades_df = pd.DataFrame()
             if "TYPE" in page_df.columns and "TRADE" in page_df["TYPE"].values:
@@ -253,11 +263,11 @@ def process_single_page(args):
                         parsed_data.tolist(), index=raw_trades.index
                     )
                     trades_df["DATE"] = raw_trades["DATE"]
-                    trades_df["TYPE"] = "TRADE" # Ensure type exists
+                    trades_df["TYPE"] = "TRADE"  # Ensure type exists
                     trades_df["DESCRIPTION"] = raw_trades["DESCRIPTION"]
-                    trades_df["AMOUNT"] = 0.0 # Placeholder
-                    trades_df["BALANCE"] = 0.0 # Placeholder
-                    
+                    trades_df["AMOUNT"] = 0.0  # Placeholder
+                    trades_df["BALANCE"] = 0.0  # Placeholder
+
                     # Rename for standard schema
                     trades_df.rename(
                         columns={
@@ -272,7 +282,7 @@ def process_single_page(args):
 
             return trades_df, transactions_df
 
-    except Exception as e:
+    except Exception:
         # print(f"Error parsing page {page_idx}: {e}")
         return None, None
 
@@ -280,44 +290,44 @@ def process_single_page(args):
 def parse_pdfs_from_folder(folder_path: Path) -> pd.DataFrame:
     """
     Parse all PDFs in folder and return trades DataFrame.
-    
+
     This is a simplified version of main() that returns the parsed trades
     instead of writing to database. Useful for CSV workflows.
-    
+
     Args:
         folder_path: Path to folder containing PDF files
-        
+
     Returns:
         DataFrame with columns: ISIN, NAME, QUANTITY, PRICE, TRADE_TYPE, DATE
     """
     pdf_files = list(folder_path.glob("*.pdf"))
-    
+
     if not pdf_files:
         print(f"No PDF files found in {folder_path}")
         return pd.DataFrame()
-    
+
     print(f"Found {len(pdf_files)} PDF file(s)")
-    
+
     all_trades_dfs = []
-    
+
     for pdf_file in pdf_files:
         print(f"Processing: {pdf_file.name}")
-        
+
         # Get page count
         with pdfplumber.open(pdf_file) as pdf:
             num_pages = len(pdf.pages)
-        
+
         # Process pages in parallel
         num_workers = min(multiprocessing.cpu_count(), num_pages)
         page_args = [(pdf_file, idx) for idx in range(num_pages)]
-        
+
         with multiprocessing.Pool(num_workers) as pool:
             results = pool.map(process_single_page, page_args)
-            
+
             for trades, _ in results:
                 if trades is not None and not trades.empty:
                     all_trades_dfs.append(trades)
-    
+
     if all_trades_dfs:
         full_trades = pd.concat(all_trades_dfs, ignore_index=True)
         print(f"Parsed {len(full_trades)} trades from {len(pdf_files)} PDF(s)")
@@ -355,31 +365,35 @@ def main():
 
     for i, pdf_file in enumerate(pdf_files, 1):
         print(f"Processing [{i}/{total_files}]: {pdf_file.name}")
-        
+
         # 1. Check Hash
         file_hash = calculate_file_hash(pdf_file)
         if is_file_processed(file_hash):
-            print(f"  - ✅ File already processed (Hash match). Skipping.")
+            print("  - ✅ File already processed (Hash match). Skipping.")
             continue
 
         # 2. Parallel Parse
         with pdfplumber.open(pdf_file) as pdf:
             num_pages = len(pdf.pages)
-        
-        print(f"  - New file detected. Parsing {num_pages} pages with {num_workers} workers...")
-        
+
+        print(
+            f"  - New file detected. Parsing {num_pages} pages with {num_workers} workers..."
+        )
+
         # Prepare args for map
         page_args = [(pdf_file, idx) for idx in range(num_pages)]
-        
+
         all_trades_dfs = []
         all_transactions_dfs = []
-        
+
         with multiprocessing.Pool(num_workers) as pool:
             # Use imap for progress tracking
             results_iterator = pool.imap(process_single_page, page_args)
-            
+
             # Wrap with tqdm for progress bar
-            for res in tqdm(results_iterator, total=num_pages, desc="Parsing Pages", unit="page"):
+            for res in tqdm(
+                results_iterator, total=num_pages, desc="Parsing Pages", unit="page"
+            ):
                 trades, transactions = res
                 if trades is not None and not trades.empty:
                     all_trades_dfs.append(trades)
@@ -388,31 +402,32 @@ def main():
 
         # 3. Consolidate & Store
         new_trades_count = 0
-        
+
         if all_transactions_dfs:
             # We currently only store 'trades' (parsed executions) in DB for unique checking
             # But we also extract 'transactions' (cash flow).
             # For the DB 'trades' table, we actually want the RAW transaction data to match the unique constraint
             # (Date, Type, Description, Amount, Balance)
-            
+
             # Merge all transactions
             full_transactions = pd.concat(all_transactions_dfs, ignore_index=True)
-            
+
             # Insert into DB and get count of NEW items
             new_trades_count = insert_trades_ignore_duplicates(full_transactions)
             print(f"  - Inserted {new_trades_count} new transactions into Database.")
-            
+
             # Save CSVs for legacy compatibility / debugging
             full_transactions.to_csv(output_path / "transactions.csv", index=False)
-        
+
         if all_trades_dfs:
-             full_trades = pd.concat(all_trades_dfs, ignore_index=True)
-             full_trades.to_csv(output_path / "trades.csv", index=False)
-             print(f"  - Generated {len(full_trades)} parsed trades (saved to CSV).")
+            full_trades = pd.concat(all_trades_dfs, ignore_index=True)
+            full_trades.to_csv(output_path / "trades.csv", index=False)
+            print(f"  - Generated {len(full_trades)} parsed trades (saved to CSV).")
 
         # 4. Mark Done
         mark_file_processed(file_hash, pdf_file.name)
         print("  - ✅ File marked as processed.")
+
 
 if __name__ == "__main__":
     # multiprocessing freeze_support() for Windows compatibility if needed

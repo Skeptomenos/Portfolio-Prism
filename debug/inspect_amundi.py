@@ -1,5 +1,4 @@
 import pandas as pd
-from python_calamine import CalamineWorkbook
 from python_calamine.pandas import pandas_monkeypatch
 
 # Activate calamine engine

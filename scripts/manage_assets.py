@@ -7,7 +7,6 @@ Provides commands to add, list, search, validate, and remove assets.
 """
 import argparse
 import pandas as pd
-import os
 import re
 import shutil
 import subprocess

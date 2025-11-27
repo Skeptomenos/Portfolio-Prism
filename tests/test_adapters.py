@@ -6,7 +6,6 @@ import os
 
 from src.adapters.vaneck import VanEckAdapter
 from src.adapters.ishares import ISharesAdapter
-from src.adapters.xtrackers import XtrackersAdapter
 
 class TestAdapters(unittest.TestCase):
 

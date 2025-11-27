@@ -1,6 +1,5 @@
 
 import os
-import sys
 import requests
 import yfinance as yf
 from dotenv import load_dotenv

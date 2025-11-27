@@ -1,14 +1,11 @@
 import unittest
 import pandas as pd
-from pandas.testing import assert_frame_equal
-import sys
 import os
 
 
 
 from src.core.aggregation import run_aggregation
 from src.config import TRUE_EXPOSURE_REPORT
-from unittest import mock
 
 class TestAggregation(unittest.TestCase):
 

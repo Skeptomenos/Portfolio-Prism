@@ -2,14 +2,11 @@
 import unittest
 from unittest.mock import patch
 import pandas as pd
-from pandas.testing import assert_frame_equal
 import os
-import sys
 
 
 
 from src.core.reporting import generate_report
-from src.data.enrichment import enrich_securities
 
 class TestReporting(unittest.TestCase):
 

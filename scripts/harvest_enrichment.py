@@ -8,7 +8,7 @@ import json
 import csv
 import os
 import sys
-from typing import Dict, List, Set
+from typing import Set
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))

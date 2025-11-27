@@ -1,16 +1,15 @@
 # phases/active/aggregation.py
 import pandas as pd
-import sys
-import os
 
 
 
-from typing import Dict, List, Any, Optional
+from typing import Dict
 from src.config import TRUE_EXPOSURE_REPORT
 from src.data.enrichment import enrich_securities
 from src.utils.classification import classify_holding
 
 from src.utils.logging_config import get_logger
+from src.core.health import health
 
 logger = get_logger(__name__)
 
@@ -93,27 +92,88 @@ def run_aggregation(
                 equity_holdings = equity_holdings.dropna(subset=['ticker'])
                 equity_holdings = equity_holdings[equity_holdings['ticker'].apply(lambda x: isinstance(x, str))]
 
-                holdings_list = equity_holdings.to_dict('records')
-                enriched_holdings = enrich_securities(holdings_list)
+                # === TIERED ENRICHMENT: Only enrich holdings >1% weight ===
+                # This dramatically reduces API calls (1500 → ~100)
+                ENRICHMENT_THRESHOLD = 1.0  # Only enrich if weight > 1%
                 
-                if enriched_holdings:
-                    enriched_df = pd.DataFrame(enriched_holdings)
+                # Ensure weight_percentage column exists and is numeric
+                if 'weight_percentage' not in equity_holdings.columns:
+                    logger.warning("    ⚠️  'weight_percentage' column missing. Enriching all holdings.")
+                    tier1_holdings = equity_holdings
+                    tier2_holdings = pd.DataFrame()
+                else:
+                    equity_holdings['weight_percentage'] = pd.to_numeric(
+                        equity_holdings['weight_percentage'], errors='coerce'
+                    ).fillna(0.0)
+                    
+                    # Split into Tier 1 (>1%) and Tier 2 (≤1%)
+                    tier1_mask = equity_holdings['weight_percentage'] > ENRICHMENT_THRESHOLD
+                    tier1_holdings = equity_holdings[tier1_mask].copy()
+                    tier2_holdings = equity_holdings[~tier1_mask].copy()
+                    
+                    # HEALTH CHECK: Tier Counts & Value Coverage
+                    health.record_metric("tier1_holdings", len(tier1_holdings))
+                    health.record_metric("tier2_holdings", len(tier2_holdings))
+                    
+                    # Calculate Value Coverage (Approximate based on weights)
+                    # etf_market_value is available in the loop scope
+                    tier1_weight = tier1_holdings['weight_percentage'].sum()
+                    tier2_weight = tier2_holdings['weight_percentage'].sum()
+                    total_weight = tier1_weight + tier2_weight
+                    
+                    if total_weight > 0:
+                        tier1_val = (tier1_weight / total_weight) * etf_market_value
+                        tier2_val = (tier2_weight / total_weight) * etf_market_value
+                        health.record_value_coverage(tier1_val, tier2_val)
+                    
+                    logger.info(f"    - Tiered Enrichment: {len(tier1_holdings)} major (>1%), {len(tier2_holdings)} minor (≤1%)")
+                    logger.info(f"    - Skipping ISIN resolution for {len(tier2_holdings)} minor holdings (will use fallback aggregation)")
+                
+                # Enrich only Tier 1 holdings (>1% weight)
+                if not tier1_holdings.empty:
+                    holdings_list = tier1_holdings.to_dict('records')
+                    enriched_holdings = enrich_securities(holdings_list)
+                    
+                    if enriched_holdings:
+                        enriched_df = pd.DataFrame(enriched_holdings)
+                        health.record_metric("tier1_resolved", len(enriched_df))
+                    else:
+                        enriched_df = pd.DataFrame(columns=['ticker', 'isin'])
                 else:
                     enriched_df = pd.DataFrame(columns=['ticker', 'isin'])
+                
+                # For Tier 2 holdings, set ISIN to N/A (fallback aggregation will handle them)
+                if not tier2_holdings.empty:
+                    tier2_holdings['isin'] = 'N/A'
+                    # Combine Tier 1 (enriched) with Tier 2 (unenriched)
+                    equity_holdings = pd.concat([tier1_holdings, tier2_holdings], ignore_index=True)
 
                 if 'ticker' in enriched_df.columns and 'ticker' in etf_holdings.columns:
                     # Merge enrichment back into main dataframe
                     etf_holdings = pd.merge(etf_holdings, enriched_df[['ticker', 'isin']], on='ticker', how='left')
                     logger.info("    - Enrichment complete. Merged ISINs into holdings.")
                     
-                    # Log ISIN resolution failures
-                    failed_isin = etf_holdings[(etf_holdings['asset_class'] == 'Equity') & (etf_holdings['isin'] == 'N/A')]
-                    if not failed_isin.empty:
-                        logger.warning(f"    ⚠️  {len(failed_isin)} securities FAILED ISIN resolution:")
-                        for ticker in failed_isin['ticker'].head(10):
+                    # Log ISIN resolution failures (only for Tier 1)
+                    tier1_failed = etf_holdings[
+                        (etf_holdings['asset_class'] == 'Equity') & 
+                        (etf_holdings['isin'] == 'N/A') &
+                        (etf_holdings['weight_percentage'] > ENRICHMENT_THRESHOLD)
+                    ]
+                    if not tier1_failed.empty:
+                        health.record_metric("tier1_failed", len(tier1_failed))
+                        logger.warning(f"    ⚠️  {len(tier1_failed)} major holdings (>1%) FAILED ISIN resolution:")
+                        for _, row in tier1_failed.iterrows():
+                            ticker = row['ticker']
                             logger.warning(f"        - {ticker}")
-                        if len(failed_isin) > 10:
-                            logger.warning(f"        ... and {len(failed_isin) - 10} more")
+                            health.record_failure(
+                                stage="ENRICHMENT",
+                                item=ticker,
+                                error="Tier 1 ISIN Resolution Failed",
+                                fix=f"Add {ticker} to config/asset_universe.csv",
+                                severity="MEDIUM"
+                            )
+                        if len(tier1_failed) > 10:
+                            logger.warning(f"        ... and {len(tier1_failed) - 10} more")
                     
                     # Fill missing ISINs for Non-Equities with a placeholder
                     missing_isin_mask = etf_holdings['isin'].isnull()
@@ -157,23 +217,47 @@ def run_aggregation(
         
         # Normalize Derivative ISINs? Maybe keep unique to see what they are.
         
-        aggregated_indirect = all_holdings.groupby('isin').agg(
+        # --- TIERED AGGREGATION LOGIC ---
+        # Goal: Aggregate by ISIN if available (Tier 1), else by Ticker+Name (Tier 2)
+        
+        def generate_group_id(row):
+            isin = row.get('isin', 'N/A')
+            # Check for valid ISIN (simple length check + not N/A/UNKNOWN)
+            if isin and isin not in ('N/A', 'nan', None) and not isin.startswith('UNKNOWN') and not isin.startswith('NON_EQUITY'):
+                return isin
+            
+            # Fallback: Ticker + Name
+            ticker = str(row.get('ticker', ''))
+            name = str(row.get('name', ''))
+            return f"FALLBACK|{ticker}|{name}"
+
+        all_holdings['group_id'] = all_holdings.apply(generate_group_id, axis=1)
+
+        aggregated_indirect = all_holdings.groupby('group_id').agg(
             indirect=('indirect', 'sum'),
             name=('name', 'first'),
+            isin=('isin', 'first'), # Keep the original ISIN (even if N/A) for reference
             asset_class=('asset_class', 'first')
         ).reset_index()
 
         for _, row in aggregated_indirect.iterrows():
-            isin = row['isin']
-            if isin in aggregated_exposures:
-                aggregated_exposures[isin]['indirect'] += row['indirect']
+            # Use group_id as the unique identifier (ISIN or Fallback)
+            key = row['group_id']
+            
+            if key in aggregated_exposures:
+                aggregated_exposures[key]['indirect'] += row['indirect']
             else:
-                aggregated_exposures[isin] = {
+                aggregated_exposures[key] = {
                     'name': row['name'],
                     'direct': 0.0,
                     'indirect': row['indirect'],
                     'asset_class': row.get('asset_class', 'Equity')
                 }
+                # Store the best available ISIN for reference
+                if row['isin'] and row['isin'] not in ('N/A', 'nan', None):
+                     aggregated_exposures[key]['isin'] = row['isin']
+                else:
+                     aggregated_exposures[key]['isin'] = 'N/A'
     logger.info("Indirect holdings processed.")
     # --- Finalize and Formatting Output ---
     logger.info("--- Finalizing and Formatting Output ---")

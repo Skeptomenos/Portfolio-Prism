@@ -1,5 +1,4 @@
 import pandas as pd
-import os
 
 # Use the long filename
 file_path = "data/inputs/manual_holdings/Fondszusammensetzung_Amundi MSCI India Swap UCITS ETF EUR Acc_FR0010361683_18_11_2025.xlsx"
