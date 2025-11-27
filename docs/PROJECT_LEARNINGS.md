@@ -89,3 +89,10 @@
 ### Phase 12: Spec-Driven Architecture (2025-11-27)
 - **Document Drift:** Documentation naturally drifts from code unless structurally enforced. **Solution:** Use a "Bootloader" (`docs/agent/GEMINI.md`) that acts as a pointer to the authoritative Directives (`docs/agent/AI_CODING_DIRECTIVES.md`) rather than duplicating them.
 - **State Persistence:** Ephemeral logs are lost. **Solution:** Mandate "Archival Rotation" of the active state file to a history folder at the end of every session.
+
+### Phase 12.5: Lint Compliance & Documentation (2025-11-28)
+- **Unicode in F-Strings:** Emojis (✓, ✗, 📊) inside Python f-strings cause syntax errors. **Rule:** Use ASCII alternatives `[OK]`, `[X]`, `[INFO]` for CLI output.
+- **Dead Code After Raise:** Code after `raise NotImplementedError()` is unreachable but still parsed. **Rule:** Comment out or delete dead code to avoid F821 undefined name errors.
+- **Bare Except Anti-Pattern:** `except:` catches `KeyboardInterrupt` and `SystemExit`. **Rule:** Always use `except Exception:` or specific types like `except (ValueError, TypeError):`.
+- **E402 Import Order:** When `sys.path.insert()` is required before imports, E402 is acceptable technical debt. **Note:** 25 remaining E402 errors are intentional for project structure.
+- **Linter as Gate:** Running `ruff check .` before commit catches issues early. Integrate into CI/CD.

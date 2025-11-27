@@ -1,5 +1,29 @@
 # Changelog
 
+## [Phase 12.5] - 2025-11-27
+
+### Fixed
+- **Lint Compliance**: Resolved 148 ruff lint errors across the codebase (85% reduction from 173 to 25).
+    - Fixed CRITICAL: `scripts/migrate_db_to_csv.py` had 63 syntax errors from unicode emojis in f-strings.
+    - Fixed HIGH: Added stubs for removed database functions in legacy files (`setup_db_legacy.py`, `parser.py`).
+    - Fixed MEDIUM: Replaced 7 bare `except:` with specific exception types.
+    - Fixed LOW: Split multiple statements on single lines (E701).
+    - Auto-fixed: Removed 50 unused imports, 16 empty f-strings, 4 unused variables.
+
+### Added
+- **Ruff Linter**: Installed `ruff 0.14.6` to enforce coding standards.
+- **Pipeline Flow Diagram**: Added comprehensive Mermaid flowchart to README.md showing all 10 pipeline stages.
+- **Documentation**: Enhanced README.md with:
+    - Pipeline stages table with key files
+    - Tiered Enrichment and Self-Learning pattern documentation
+    - Development section (pytest, ruff commands)
+    - Key Design Patterns summary table
+
+### Changed
+- **README.md**: Major rewrite with detailed architecture documentation (+164 lines).
+
+---
+
 ## [Phase 12] - 2025-11-27
 
 ### Changed

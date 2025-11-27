@@ -1,16 +1,17 @@
 # 🟢 Active Session State
-**Objective:** Fix "Vertex Claude 4.5" error by routing through LiteLLM.
-**Status:** Build
+**Objective:** [New Session - Awaiting Task]
+**Status:** Ready
 
 ## 🛡️ Applied Constraints
-- Logic/IO Separation (Config isolation)
-- Zero Trust (Validate config)
+- Logic/IO Separation
+- Cache-First IO
+- Linter Compliance (ruff)
 
 ## 📝 Current Focus
-- **Phase:** Phase 2: Build & Implement
-- **Ref:** `opencode.json`
+- **Phase:** Idle
+- **Ref:** See `docs/specs/tasks.md` for pending tasks.
 
 ## 🧠 Context & Learnings
-- **Configuration Switch:** Switched from direct `vertex` provider (broken) to `litellm` proxy (OpenAI compatible).
-- **Model ID:** Using `vertex_ai/claude-opus-4-5` as defined in LiteLLM params.
-- **Port:** Assumed default `http://localhost:4000`. User must ensure LiteLLM is running.
+- Previous session completed lint fixes and documentation.
+- 25 E402 errors remain (intentional for sys.path patterns).
+- Test suite: 8 passed, 1 pre-existing failure.
