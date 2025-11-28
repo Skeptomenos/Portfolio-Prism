@@ -82,8 +82,8 @@
 - [x] **TASK-008d:** Document pandas stub limitations in output.py.
     - **Note:** `pd.DataFrame(columns=[...])` has incorrect type stubs - runtime correct.
     - **Status:** Completed 2025-11-28. No code change needed.
-- [~] **TASK-008e:** Add type annotations to test files (optional).
-    - **Status:** Cancelled - low value, test files work correctly.
+- [x] **TASK-008e:** Add type annotations to test files (optional).
+    - **Status:** Completed 2025-11-28. Added `-> None` return types to all test methods.
 - **Status:** ✅ Completed
 - **Strategy:** Used explicit `str()`, `float()`, and `cast()` on DataFrame row access. Remaining warnings are pandas type stub issues (not runtime errors).
 

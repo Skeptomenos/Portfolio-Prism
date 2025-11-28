@@ -1,15 +1,19 @@
 # tests/test_reporting.py
-import unittest
-from unittest.mock import patch
-import pandas as pd
-import os
+"""Tests for the reporting module."""
 
+import os
+import unittest
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
 
 from src.core.reporting import generate_report
 
 
 class TestReporting(unittest.TestCase):
-    def setUp(self):
+    """Test suite for report generation."""
+
+    def setUp(self) -> None:
         """Set up a dummy input file for testing."""
         self.input_filepath = "outputs/test_exposure_report.csv"
         self.output_files = [
@@ -31,7 +35,7 @@ class TestReporting(unittest.TestCase):
         )
         self.sample_df.to_csv(self.input_filepath, index=False)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up generated files after tests."""
         os.remove(self.input_filepath)
         for f in self.output_files:
@@ -39,7 +43,7 @@ class TestReporting(unittest.TestCase):
                 os.remove(f)
 
     @patch("src.core.reporting.enrich_securities")
-    def test_reporting_logic_unit(self, mock_enrich_securities):
+    def test_reporting_logic_unit(self, mock_enrich_securities: MagicMock) -> None:
         """
         Unit Test: Validates the calculation logic of the reporting module in isolation.
         It mocks the enrichment step to focus purely on the grouping and sorting.
@@ -84,7 +88,7 @@ class TestReporting(unittest.TestCase):
         )
 
     @patch("src.core.reporting.enrich_securities")
-    def test_reporting_integration(self, mock_enrich_securities):
+    def test_reporting_integration(self, mock_enrich_securities: MagicMock) -> None:
         """
         Integration Test: Validates that the reporting module can correctly
         consume the output of the (real) enrichment module.

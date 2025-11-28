@@ -1,14 +1,18 @@
-import unittest
-import pandas as pd
+"""Tests for the aggregation module."""
+
 import os
+import unittest
 
+import pandas as pd
 
-from src.core.aggregation import run_aggregation
 from src.config import TRUE_EXPOSURE_REPORT
+from src.core.aggregation import run_aggregation
 
 
 class TestAggregation(unittest.TestCase):
-    def test_aggregation_with_overlapping_indirect_holdings(self):
+    """Test suite for aggregation logic."""
+
+    def test_aggregation_with_overlapping_indirect_holdings(self) -> None:
         """
         Tests the specific scenario where a security is held directly and also
         appears in multiple ETFs, verifying the aggregation logic correctly sums
@@ -57,9 +61,11 @@ class TestAggregation(unittest.TestCase):
         aapl_row = actual_df[actual_df["isin"] == "AAPL"]
         self.assertFalse(aapl_row.empty)
 
-        self.assertAlmostEqual(aapl_row["direct"].iloc[0], 100.0, places=2)
-        self.assertAlmostEqual(aapl_row["indirect"].iloc[0], 200.0, places=2)
-        self.assertAlmostEqual(aapl_row["total_exposure"].iloc[0], 300.0, places=2)
+        self.assertAlmostEqual(float(aapl_row["direct"].iloc[0]), 100.0, places=2)
+        self.assertAlmostEqual(float(aapl_row["indirect"].iloc[0]), 200.0, places=2)
+        self.assertAlmostEqual(
+            float(aapl_row["total_exposure"].iloc[0]), 300.0, places=2
+        )
 
 
 if __name__ == "__main__":

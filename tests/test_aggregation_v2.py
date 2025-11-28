@@ -11,9 +11,6 @@ import unittest
 
 import pandas as pd
 
-from src.models import AggregatedExposure
-
-# Module imports for unit tests
 from src.core.aggregation.classification import classify_etf_holdings
 from src.core.aggregation.direct import process_direct_holdings
 from src.core.aggregation.grouping import (
@@ -23,12 +20,13 @@ from src.core.aggregation.grouping import (
     normalize_special_assets,
 )
 from src.core.aggregation.output import finalize_and_save
+from src.models import AggregatedExposure
 
 
 class TestDirectModule(unittest.TestCase):
     """Tests for direct.py module."""
 
-    def test_process_direct_holdings_adds_records(self):
+    def test_process_direct_holdings_adds_records(self) -> None:
         """Direct holdings are added to exposures with correct values."""
         direct_positions = pd.DataFrame(
             {
@@ -47,7 +45,7 @@ class TestDirectModule(unittest.TestCase):
         self.assertEqual(apple.direct, 1000.0)
         self.assertEqual(apple.name, "Apple Inc.")
 
-    def test_process_direct_holdings_empty_df(self):
+    def test_process_direct_holdings_empty_df(self) -> None:
         """Empty DataFrame results in no records."""
         direct_positions = pd.DataFrame(columns=["isin", "name", "market_value"])
         exposures = AggregatedExposure()
@@ -60,7 +58,7 @@ class TestDirectModule(unittest.TestCase):
 class TestClassificationModule(unittest.TestCase):
     """Tests for classification.py module."""
 
-    def test_classify_etf_holdings_adds_asset_class(self):
+    def test_classify_etf_holdings_adds_asset_class(self) -> None:
         """Holdings get asset_class column after classification."""
         holdings = pd.DataFrame(
             {
@@ -74,7 +72,7 @@ class TestClassificationModule(unittest.TestCase):
         self.assertIn("asset_class", result.columns)
         self.assertEqual(len(result), 3)
 
-    def test_classify_identifies_cash(self):
+    def test_classify_identifies_cash(self) -> None:
         """Cash holdings are identified correctly."""
         holdings = pd.DataFrame(
             {
@@ -91,7 +89,7 @@ class TestClassificationModule(unittest.TestCase):
 class TestGroupingModule(unittest.TestCase):
     """Tests for grouping.py module."""
 
-    def test_calculate_indirect_values(self):
+    def test_calculate_indirect_values(self) -> None:
         """Indirect values are calculated correctly from weights."""
         holdings = pd.DataFrame(
             {
@@ -106,7 +104,7 @@ class TestGroupingModule(unittest.TestCase):
         self.assertEqual(result["indirect"].iloc[0], 1000.0)  # 10% of 10000
         self.assertEqual(result["indirect"].iloc[1], 500.0)  # 5% of 10000
 
-    def test_calculate_indirect_values_german_format(self):
+    def test_calculate_indirect_values_german_format(self) -> None:
         """German number format (comma as decimal) is handled."""
         holdings = pd.DataFrame(
             {
@@ -120,7 +118,7 @@ class TestGroupingModule(unittest.TestCase):
 
         self.assertAlmostEqual(result["indirect"].iloc[0], 105.0, places=2)
 
-    def test_generate_group_id_with_valid_isin(self):
+    def test_generate_group_id_with_valid_isin(self) -> None:
         """Valid ISIN is used as group ID."""
         row = pd.Series({"isin": "US0378331005", "ticker": "AAPL", "name": "Apple"})
 
@@ -128,7 +126,7 @@ class TestGroupingModule(unittest.TestCase):
 
         self.assertEqual(result, "US0378331005")
 
-    def test_generate_group_id_fallback(self):
+    def test_generate_group_id_fallback(self) -> None:
         """Fallback ID is generated when ISIN is invalid."""
         row = pd.Series({"isin": "N/A", "ticker": "AAPL", "name": "Apple Inc."})
 
@@ -136,7 +134,7 @@ class TestGroupingModule(unittest.TestCase):
 
         self.assertEqual(result, "FALLBACK|AAPL|Apple Inc.")
 
-    def test_normalize_special_assets_cash(self):
+    def test_normalize_special_assets_cash(self) -> None:
         """Cash holdings are normalized to CASH_USD."""
         holdings = pd.DataFrame(
             {
@@ -151,7 +149,7 @@ class TestGroupingModule(unittest.TestCase):
         self.assertEqual(result["isin"].iloc[0], "CASH_USD")
         self.assertEqual(result["name"].iloc[0], "Cash & Equivalents")
 
-    def test_aggregate_indirect_holdings(self):
+    def test_aggregate_indirect_holdings(self) -> None:
         """Indirect holdings from multiple ETFs are summed correctly."""
         # Same security appearing in two ETFs
         all_holdings = pd.DataFrame(
@@ -174,7 +172,7 @@ class TestGroupingModule(unittest.TestCase):
 class TestOutputModule(unittest.TestCase):
     """Tests for output.py module."""
 
-    def test_finalize_and_save_creates_file(self):
+    def test_finalize_and_save_creates_file(self) -> None:
         """Output file is created with correct columns."""
         exposures = AggregatedExposure()
         record = exposures.get_or_create_record("ISIN123", "Test Stock", "Equity")
@@ -191,7 +189,7 @@ class TestOutputModule(unittest.TestCase):
         # Cleanup
         os.remove(test_output)
 
-    def test_finalize_and_save_empty_exposures(self):
+    def test_finalize_and_save_empty_exposures(self) -> None:
         """Empty exposures produce empty DataFrame."""
         exposures = AggregatedExposure()
         test_output = "/tmp/test_empty_output.csv"
@@ -210,7 +208,7 @@ class TestAggregationIntegration(unittest.TestCase):
     Integration test for the aggregation module end-to-end.
     """
 
-    def test_run_aggregation_overlapping_holdings(self):
+    def test_run_aggregation_overlapping_holdings(self) -> None:
         """
         Test that overlapping indirect holdings (same security in multiple ETFs)
         are correctly summed.

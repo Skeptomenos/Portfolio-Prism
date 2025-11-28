@@ -1,19 +1,27 @@
-import pytest
-import pandas as pd
+"""Integration tests for the aggregation pipeline."""
+
 import os
+from typing import Dict
 from unittest.mock import MagicMock, patch
-from src.core.aggregation import run_aggregation
+
+import pandas as pd
+import pytest
+
 from src.adapters.ishares import ISharesAdapter
+from src.core.aggregation import run_aggregation
 
 # Fixture paths
-FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
-ASSET_UNIVERSE_TEST_PATH = os.path.join(FIXTURES_DIR, "asset_universe_test.csv")
-PORTFOLIO_HOLDINGS_TEST_PATH = os.path.join(FIXTURES_DIR, "portfolio_holdings_test.csv")
-ISHARES_HOLDINGS_TEST_PATH = os.path.join(FIXTURES_DIR, "ishares_holdings.csv")
+FIXTURES_DIR: str = os.path.join(os.path.dirname(__file__), "fixtures")
+ASSET_UNIVERSE_TEST_PATH: str = os.path.join(FIXTURES_DIR, "asset_universe_test.csv")
+PORTFOLIO_HOLDINGS_TEST_PATH: str = os.path.join(
+    FIXTURES_DIR, "portfolio_holdings_test.csv"
+)
+ISHARES_HOLDINGS_TEST_PATH: str = os.path.join(FIXTURES_DIR, "ishares_holdings.csv")
 
 
 @pytest.fixture
-def mock_asset_universe():
+def mock_asset_universe() -> Dict[str, str]:
+    """Load test asset universe as ticker->ISIN mapping."""
     if not os.path.exists(ASSET_UNIVERSE_TEST_PATH):
         pytest.fail(f"Fixture not found: {ASSET_UNIVERSE_TEST_PATH}")
     df = pd.read_csv(ASSET_UNIVERSE_TEST_PATH)
@@ -29,8 +37,11 @@ def mock_asset_universe():
 @patch("src.adapters.ishares.requests.get")
 @patch("src.data.enrichment.load_asset_universe")
 def test_pipeline_integration(
-    mock_load_universe, mock_requests_get, mock_save, mock_asset_universe
-):
+    mock_load_universe: MagicMock,
+    mock_requests_get: MagicMock,
+    mock_save: MagicMock,
+    mock_asset_universe: Dict[str, str],
+) -> None:
     """
     Integration test for the full aggregation pipeline.
 

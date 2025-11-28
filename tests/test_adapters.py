@@ -1,19 +1,23 @@
-import unittest
-from unittest.mock import patch
-import pandas as pd
+"""Tests for ETF data adapters (VanEck, iShares)."""
+
 import os
+import unittest
+from unittest.mock import MagicMock, patch
 
+import pandas as pd
 
-from src.adapters.vaneck import VanEckAdapter
 from src.adapters.ishares import ISharesAdapter
+from src.adapters.vaneck import VanEckAdapter
 
 
 class TestAdapters(unittest.TestCase):
-    def get_fixture_path(self, name):
+    """Contract tests for ETF data adapters."""
+
+    def get_fixture_path(self, name: str) -> str:
         return os.path.join(os.path.dirname(__file__), "fixtures", name)
 
     @patch("requests.get")
-    def test_vaneck_adapter_contract(self, mock_get):
+    def test_vaneck_adapter_contract(self, mock_get: MagicMock) -> None:
         """
         Contract Test: Validates the VanEckAdapter against a saved local fixture.
         """
@@ -34,7 +38,7 @@ class TestAdapters(unittest.TestCase):
         self.assertTrue(pd.api.types.is_numeric_dtype(df["weight_percentage"]))
 
     @patch("requests.get")
-    def test_ishares_adapter_contract(self, mock_get):
+    def test_ishares_adapter_contract(self, mock_get: MagicMock) -> None:
         """
         Contract Test: Validates the ISharesAdapter against a saved local fixture.
         """
