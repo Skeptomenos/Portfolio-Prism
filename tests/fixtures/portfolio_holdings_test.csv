@@ -1,0 +1,3 @@
+,isin,name,ticker_src,asset_type,quantity,current_price,market_value,portfolio_weight,provider
+0,IE00B4L5Y983,iShares Core MSCI World ETF,IWDA.AS,ETF,10.0,100.0,1000.0,0.5,iShares
+1,US0378331005,Apple Inc,AAPL,Stock,5.0,200.0,1000.0,0.5,

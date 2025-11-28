@@ -1,25 +1,30 @@
-# Handover: Phase 13 Complete (Aggregation Refactor)
+# Handover: Phase 13 Complete (Integration Tests)
 
 ## Summary
-- **TASK-005:** Pydantic models integrated (state_manager.py, aggregation)
-- **TASK-006:** Monolithic aggregation.py refactored into modular package
+- **TASK-010:** Integration tests completed for aggregation pipeline
+- End-to-end validation of direct + indirect holdings aggregation
 
 ## Key Deliverables
-- `src/core/aggregation/` - 6 modular files replacing 350-line monolith
-- `tests/test_aggregation_v2.py` - 13 unit tests covering all modules
-- All callers updated (`run_pipeline.py`, `test_aggregation.py`)
+- `tests/test_integration.py` - End-to-end pipeline validation
+- `tests/fixtures/asset_universe_test.csv` - Minimal ticker→ISIN mapping
+- `tests/fixtures/portfolio_holdings_test.csv` - Controlled portfolio (1 Stock + 1 ETF)
+- `tests/fixtures/ishares_holdings.csv` - Mock iShares ETF holdings
 
 ## Metrics
-- **Tests:** 22 passed
-- **Lint:** 25 E402 (intentional), 1 E722 (known)
+- **Tests:** 23 passed (all green)
+- **Lint:** Line-length warnings only (E501)
 - **Format:** Applied
 
-## Files Changed (Uncommitted)
-- New: `src/core/aggregation/`, `tests/test_aggregation_v2.py`
-- Modified: `scripts/run_pipeline.py`, `tests/test_aggregation.py`
-- Deleted: `src/core/aggregation.py`
-- Updated: `CHANGELOG.md`, `PROJECT_LEARNINGS.md`, `tasks.md`
+## Key Learnings
+- `finalize_and_save` receives `(AggregatedExposure, str)` not `(DataFrame, str)`
+- Output columns: `direct`, `indirect`, `total_exposure` (not `*_value` variants)
+- Integration tests need to mock both adapter AND enrichment layers
+
+## Files Changed
+- New: `tests/test_integration.py`, `tests/fixtures/*.csv`
+- Modified: `CHANGELOG.md`, `docs/specs/tasks.md`
+- Archived: `.context/history/2025-11-28_IntegrationTests.md`
 
 ## Next Steps
-1. **TASK-008:** Add type hints to resolve type checker warnings
-2. **TASK-010a/b:** Create integration test fixtures
+1. **TASK-008:** Add type hints to resolve static type checker warnings
+2. Consider adding more edge case tests (empty ETF, missing ISIN, etc.)

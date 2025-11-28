@@ -1,6 +1,6 @@
 # 🟢 Active Session State
-**Objective:** [Awaiting Next Task]
-**Status:** Idle
+**Objective:** Session Complete - Ready for Handover
+**Status:** Epilogue
 
 ## 🛡️ Applied Constraints
 - Logic/IO Separation
@@ -8,11 +8,19 @@
 - Linter Compliance (ruff)
 - Schema Validation (Pydantic v2)
 
-## 📝 Current Focus
-- **Phase:** Phase 2 Complete
-- **Task:** None active
+## 📝 Completed Work
+- **Phase:** Phase 2 (Technical Debt & Optimization)
+- **Task:** TASK-010 (Integration Tests) - COMPLETED
 - **Ref:** `docs/specs/tasks.md`
 
-## 🧠 Context & Learnings
-- Previous session archived to `.context/history/2025-11-28_AggregationRefactor.md`
-- See `.context/handover.md` for continuity context
+## ✅ Session Summary
+1. Fixed integration test mock signature (`finalize_and_save` receives `AggregatedExposure`)
+2. Fixed column name assertions (`direct`/`indirect`/`total_exposure`)
+3. All 23 tests passing
+4. No ruff errors (only line-length warnings)
+
+## 📦 Files Changed
+- `tests/test_integration.py` - Fixed mock and assertions
+- `docs/specs/tasks.md` - Marked TASK-010 complete
+- `CHANGELOG.md` - Added integration test entries
+- `.context/history/2025-11-28_IntegrationTests.md` - Archived session

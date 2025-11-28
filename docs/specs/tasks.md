@@ -57,15 +57,17 @@
 - **Estimated Time:** 2.5 hours (actual: ~1.5 hours)
 
 ### TASK-010: Add Integration Tests
-- [ ] **TASK-010a:** Create test fixtures in `tests/fixtures/`.
-    - **Files:** `asset_universe_test.csv`, `portfolio_holdings_test.csv`
-- [ ] **TASK-010b:** Implement `tests/test_integration.py`.
-    - **Tests:** Pipeline runs, value conservation, direct holdings preserved, ETF decomposition
+- [x] **TASK-010a:** Create test fixtures in `tests/fixtures/`.
+    - **Files:** `asset_universe_test.csv`, `portfolio_holdings_test.csv`, `ishares_holdings.csv`
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-010b:** Implement `tests/test_integration.py`.
+    - **Tests:** Pipeline runs, value conservation, direct+indirect holdings aggregation
+    - **Status:** Completed 2025-11-28. Fixed mock signature and column name assertions.
 - [x] **TASK-010c:** Add unit tests for refactored aggregation modules.
     - **File:** `tests/test_aggregation_v2.py` (13 tests covering all modules)
     - **Status:** Completed 2025-11-28 (as part of TASK-006).
-- **Status:** Partially Complete
-- **Estimated Time:** 1 hour (remaining)
+- **Status:** ✅ Completed
+- **Estimated Time:** 1 hour (actual: ~30 mins)
 
 ### TASK-008: Add Type Hints to Core Modules
 - [ ] **TASK-008:** Add type hints to resolve type checker warnings.

@@ -18,9 +18,14 @@
     - `TestGroupingModule` (6 tests) - ISIN grouping, fallback IDs, cash normalization
     - `TestOutputModule` (2 tests) - File output and empty handling
     - `TestAggregationIntegration` (1 test) - End-to-end overlapping holdings
+- **Integration Tests**: Created `tests/test_integration.py` with end-to-end pipeline validation:
+    - Validates direct + indirect holdings aggregation
+    - Uses controlled fixtures (`asset_universe_test.csv`, `portfolio_holdings_test.csv`, `ishares_holdings.csv`)
+    - Mocks external API calls for deterministic testing
 
 ### Fixed
 - **Ruff Format**: Applied `ruff format .` across 42 files for consistent code style.
+- **Integration Test Mock**: Fixed `finalize_and_save` mock signature to properly handle `AggregatedExposure` objects.
 
 ### Removed
 - **Legacy Aggregation**: Deleted monolithic `src/core/aggregation.py` after successful migration.
