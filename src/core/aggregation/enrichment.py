@@ -1,6 +1,6 @@
 """Tiered ISIN enrichment for ETF holdings."""
 
-from typing import Tuple
+from typing import Tuple, cast
 
 import pandas as pd
 
@@ -52,12 +52,11 @@ def enrich_etf_holdings(
 
     # Filter out invalid tickers
     if "ticker" in equity_holdings.columns:
-        equity_holdings = equity_holdings.dropna(subset=["ticker"])
-        equity_holdings = equity_holdings[
-            equity_holdings["ticker"].apply(
-                lambda x: isinstance(x, str) and len(str(x)) > 0
-            )
-        ]
+        equity_holdings = equity_holdings.dropna(subset=["ticker"]).copy()
+        valid_mask = equity_holdings["ticker"].apply(
+            lambda x: isinstance(x, str) and len(str(x)) > 0
+        )
+        equity_holdings = equity_holdings[valid_mask].copy()
 
     if equity_holdings.empty:
         logger.info("    - No valid equity holdings to enrich.")
@@ -66,7 +65,7 @@ def enrich_etf_holdings(
 
     # Split into tiers based on weight
     tier1_holdings, tier2_holdings = _split_by_weight(
-        equity_holdings, etf_market_value, threshold
+        cast(pd.DataFrame, equity_holdings), etf_market_value, threshold
     )
 
     # Enrich Tier 1 only
@@ -100,9 +99,8 @@ def _split_by_weight(
 
     # Ensure numeric
     equity_holdings = equity_holdings.copy()
-    equity_holdings["weight_percentage"] = pd.to_numeric(
-        equity_holdings["weight_percentage"], errors="coerce"
-    ).fillna(0.0)
+    weight_series = pd.to_numeric(equity_holdings["weight_percentage"], errors="coerce")
+    equity_holdings["weight_percentage"] = weight_series.fillna(0.0)
 
     # Split by threshold
     tier1_mask = equity_holdings["weight_percentage"] > threshold
@@ -129,7 +127,7 @@ def _split_by_weight(
     )
     logger.info(f"    - Skipping ISIN resolution for {len(tier2)} minor holdings")
 
-    return tier1, tier2
+    return cast(pd.DataFrame, tier1), cast(pd.DataFrame, tier2)
 
 
 def _enrich_tier1(tier1_holdings: pd.DataFrame) -> pd.DataFrame:

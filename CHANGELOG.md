@@ -29,6 +29,7 @@
 - **Pydantic v2 Deprecation**: Updated `src/models/holdings.py` to use `ConfigDict` instead of deprecated `class Config`.
 - **Pandera Import Warnings**: Updated imports to `import pandera.pandas as pa` to eliminate FutureWarning.
 - **Bare Except Anti-Pattern**: Fixed E722 in `scripts/visualize_portfolio.py` by using specific exception types.
+- **Type Hints (TASK-008)**: Added explicit type casts (`str()`, `float()`, `cast()`) in aggregation modules to resolve type checker warnings for DataFrame row access patterns.
 
 ### Removed
 - **Legacy Aggregation**: Deleted monolithic `src/core/aggregation.py` after successful migration.

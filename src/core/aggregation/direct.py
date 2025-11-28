@@ -26,9 +26,9 @@ def process_direct_holdings(
 
     for _, row in direct_positions.iterrows():
         record = exposures.get_or_create_record(
-            isin=row["isin"], name=row["name"], asset_class="Equity"
+            isin=str(row["isin"]), name=str(row["name"]), asset_class="Equity"
         )
-        record.direct = row["market_value"]
+        record.direct = float(row["market_value"])
         record.sector = "Direct Holding"
         record.geography = "Global"
 

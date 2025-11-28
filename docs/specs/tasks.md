@@ -70,9 +70,22 @@
 - **Estimated Time:** 1 hour (actual: ~30 mins)
 
 ### TASK-008: Add Type Hints to Core Modules
-- [ ] **TASK-008:** Add type hints to resolve type checker warnings.
-    - **Context/Constraints:** Many pandas type stub issues. Focus on function signatures.
-    - **Status:** Pending (deferred until after TASK-005/006)
+- [x] **TASK-008a:** Add explicit type casts in `src/core/aggregation/direct.py`.
+    - **Issue:** `row["isin"]` returns ambiguous type; needs `str(row["isin"])` cast.
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-008b:** Add explicit type casts in `src/core/aggregation/grouping.py`.
+    - **Issue:** Same row access pattern; `record.add_indirect()` receives ambiguous type.
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-008c:** Add explicit type casts in `src/core/aggregation/enrichment.py`.
+    - **Issue:** `dropna(subset=)` and DataFrame subset return types. Used `cast()` for return types.
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-008d:** Document pandas stub limitations in output.py.
+    - **Note:** `pd.DataFrame(columns=[...])` has incorrect type stubs - runtime correct.
+    - **Status:** Completed 2025-11-28. No code change needed.
+- [~] **TASK-008e:** Add type annotations to test files (optional).
+    - **Status:** Cancelled - low value, test files work correctly.
+- **Status:** ✅ Completed
+- **Strategy:** Used explicit `str()`, `float()`, and `cast()` on DataFrame row access. Remaining warnings are pandas type stub issues (not runtime errors).
 
 ## Phase 3: Code Quality & Cleanup
 

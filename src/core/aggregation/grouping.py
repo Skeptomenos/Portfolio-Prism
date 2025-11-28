@@ -141,8 +141,8 @@ def aggregate_indirect_holdings(
         )
 
         record = exposures.get_or_create_record(
-            isin=row["group_id"], name=row["name"], asset_class=asset_class
+            isin=str(row["group_id"]), name=str(row["name"]), asset_class=asset_class
         )
-        record.add_indirect(row["indirect"])
+        record.add_indirect(float(row["indirect"]))
 
     logger.info("Indirect holdings aggregated.")
