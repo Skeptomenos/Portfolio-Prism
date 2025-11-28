@@ -44,28 +44,28 @@
 - **Estimated Time:** 2-3 hours
 
 ### TASK-006: Refactor `aggregation.py` Module
-- [ ] **TASK-006a:** Extract `process_direct_holdings()` to `src/core/aggregation/direct.py`.
-    - **Lines:** 33-49 of current `aggregation.py`
-- [ ] **TASK-006b:** Extract classification logic to `src/core/aggregation/classification.py`.
-    - **Lines:** 71-79 of current `aggregation.py`
-- [ ] **TASK-006c:** Extract tiered enrichment to `src/core/aggregation/enrichment.py`.
-    - **Lines:** 86-176 of current `aggregation.py`
-- [ ] **TASK-006d:** Extract aggregation logic to `src/core/aggregation/grouping.py`.
-    - **Lines:** 206-261 of current `aggregation.py`
-- [ ] **TASK-006e:** Create new `src/core/aggregation/__init__.py` with clean public API.
-    - **Constraint:** `run_aggregation()` signature unchanged for backward compat
-- **Status:** Pending
-- **Estimated Time:** 2-3 hours
+- [x] **TASK-006a:** Create `src/core/aggregation/` modular package.
+    - **Files:** `direct.py`, `classification.py`, `grouping.py`, `enrichment.py`, `output.py`, `__init__.py`
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-006b:** Create unit tests for each module.
+    - **File:** `tests/test_aggregation_v2.py` (13 tests)
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-006c:** Migrate callers and remove old monolithic file.
+    - **Updated:** `scripts/run_pipeline.py`, `tests/test_aggregation.py`
+    - **Status:** Completed 2025-11-28.
+- **Status:** ✅ Completed
+- **Estimated Time:** 2.5 hours (actual: ~1.5 hours)
 
 ### TASK-010: Add Integration Tests
 - [ ] **TASK-010a:** Create test fixtures in `tests/fixtures/`.
     - **Files:** `asset_universe_test.csv`, `portfolio_holdings_test.csv`
 - [ ] **TASK-010b:** Implement `tests/test_integration.py`.
     - **Tests:** Pipeline runs, value conservation, direct holdings preserved, ETF decomposition
-- [ ] **TASK-010c:** Add unit tests for refactored aggregation modules.
-    - **Files:** `tests/test_aggregation/test_direct.py`, `test_grouping.py`, etc.
-- **Status:** Pending
-- **Estimated Time:** 1-2 hours
+- [x] **TASK-010c:** Add unit tests for refactored aggregation modules.
+    - **File:** `tests/test_aggregation_v2.py` (13 tests covering all modules)
+    - **Status:** Completed 2025-11-28 (as part of TASK-006).
+- **Status:** Partially Complete
+- **Estimated Time:** 1 hour (remaining)
 
 ### TASK-008: Add Type Hints to Core Modules
 - [ ] **TASK-008:** Add type hints to resolve type checker warnings.

@@ -1,5 +1,32 @@
 # Changelog
 
+## [Phase 13] - 2025-11-28
+
+### Changed
+- **Aggregation Module Refactor**: Decomposed monolithic `src/core/aggregation.py` (350+ lines) into a modular package `src/core/aggregation/` with 6 focused modules:
+    - `direct.py` - Direct stock holdings processing
+    - `classification.py` - Asset classification (Equity/Cash/Derivative)
+    - `grouping.py` - ISIN grouping and value aggregation
+    - `enrichment.py` - Tiered ISIN resolution (>1% weight threshold)
+    - `output.py` - CSV output formatting and saving
+    - `__init__.py` - Public API (`run_aggregation`)
+
+### Added
+- **Unit Tests**: Created `tests/test_aggregation_v2.py` with 13 unit tests covering all aggregation submodules:
+    - `TestDirectModule` (2 tests) - Direct holdings processing
+    - `TestClassificationModule` (2 tests) - Asset classification
+    - `TestGroupingModule` (6 tests) - ISIN grouping, fallback IDs, cash normalization
+    - `TestOutputModule` (2 tests) - File output and empty handling
+    - `TestAggregationIntegration` (1 test) - End-to-end overlapping holdings
+
+### Fixed
+- **Ruff Format**: Applied `ruff format .` across 42 files for consistent code style.
+
+### Removed
+- **Legacy Aggregation**: Deleted monolithic `src/core/aggregation.py` after successful migration.
+
+---
+
 ## [Phase 12.5] - 2025-11-27
 
 ### Fixed

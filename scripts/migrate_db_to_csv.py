@@ -4,6 +4,7 @@ One-time migration: portfolio.db -> portfolio_holdings.csv
 
 Safely merge SQLite positions into CSV format.
 """
+
 import sqlite3
 import pandas as pd
 from pathlib import Path
@@ -48,10 +49,7 @@ def load_db_positions():
     """Load positions from SQLite."""
     conn = sqlite3.connect(DB_PATH)
     try:
-        df = pd.read_sql_query(
-            "SELECT ISIN, total_quantity FROM positions",
-            conn
-        )
+        df = pd.read_sql_query("SELECT ISIN, total_quantity FROM positions", conn)
     except Exception as e:
         print(f"Error reading DB: {e}")
         return pd.DataFrame()
@@ -141,9 +139,14 @@ def migrate(mode="merge"):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Migrate portfolio.db to CSV")
-    parser.add_argument("--mode", choices=["merge", "overwrite", "skip", "status"],
-                        default="status", help="Migration mode")
+    parser.add_argument(
+        "--mode",
+        choices=["merge", "overwrite", "skip", "status"],
+        default="status",
+        help="Migration mode",
+    )
     args = parser.parse_args()
 
     if args.mode == "status":

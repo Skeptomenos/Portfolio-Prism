@@ -32,7 +32,7 @@ except Exception as e:
 # 4. Try reading with 'openpyxl' explicitly
 print("\n--- Pandas (engine='openpyxl') ---")
 try:
-    df = pd.read_excel(file_path, engine='openpyxl')
+    df = pd.read_excel(file_path, engine="openpyxl")
     print("Success!")
 except Exception as e:
     print(f"Failed: {e}")

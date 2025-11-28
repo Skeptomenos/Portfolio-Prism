@@ -3,10 +3,12 @@ import os
 from datetime import datetime
 from collections import defaultdict
 
+
 class MetricsTracker:
     """
     Simple singleton-style tracker for pipeline execution metrics.
     """
+
     _instance = None
 
     def __new__(cls):
@@ -33,14 +35,14 @@ class MetricsTracker:
                 "etf_positions": 0,
                 "etfs_with_adapter": 0,
                 "etfs_successfully_fetched": 0,
-                "etfs_failed": 0
+                "etfs_failed": 0,
             },
             "system": {
-                "api_calls_yfinance": 0, # To be implemented in market.py
+                "api_calls_yfinance": 0,  # To be implemented in market.py
                 "api_calls_providers": 0,
                 "cache_hits": 0,
-                "validation_errors": 0
-            }
+                "validation_errors": 0,
+            },
         }
         self._start_time = datetime.now()
 
@@ -51,7 +53,9 @@ class MetricsTracker:
 
     def end_run(self):
         """Calculates duration."""
-        self.metrics["duration_seconds"] = (datetime.now() - self._start_time).total_seconds()
+        self.metrics["duration_seconds"] = (
+            datetime.now() - self._start_time
+        ).total_seconds()
 
     def set_funnel_metric(self, key: str, value: int):
         """Sets a specific funnel metric (absolute value)."""
@@ -71,10 +75,11 @@ class MetricsTracker:
         self.end_run()
         try:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(self.metrics, f, indent=4)
         except Exception as e:
             print(f"Failed to save metrics: {e}")
+
 
 # Global instance
 tracker = MetricsTracker()

@@ -96,3 +96,10 @@
 - **Bare Except Anti-Pattern:** `except:` catches `KeyboardInterrupt` and `SystemExit`. **Rule:** Always use `except Exception:` or specific types like `except (ValueError, TypeError):`.
 - **E402 Import Order:** When `sys.path.insert()` is required before imports, E402 is acceptable technical debt. **Note:** 25 remaining E402 errors are intentional for project structure.
 - **Linter as Gate:** Running `ruff check .` before commit catches issues early. Integrate into CI/CD.
+
+### Phase 13: Aggregation Refactor (2025-11-28)
+- **Parallel Development Strategy:** When refactoring critical modules, build new code alongside old (`aggregation_v2/`), test equivalence, then atomic switch. Zero downtime, safe rollback.
+- **Modular Decomposition:** 350-line monolith → 6 focused modules. Each module <100 lines. Single responsibility = easier testing and debugging.
+- **Test Before Delete:** Never delete old code until new code passes ALL existing tests + new unit tests. Integration test comparing old vs new output is critical proof.
+- **AggregatedExposure Model:** Using Pydantic model with `get_or_create_record()` pattern simplifies aggregation logic. Records stored as list, accessed via `get_record(isin)` method.
+- **Tiered Enrichment:** Only resolve ISINs for holdings >1% weight. Reduces API calls by 80%+ while maintaining 95%+ value coverage. Minor holdings use fallback grouping.

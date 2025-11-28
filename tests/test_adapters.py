@@ -7,40 +7,40 @@ import os
 from src.adapters.vaneck import VanEckAdapter
 from src.adapters.ishares import ISharesAdapter
 
+
 class TestAdapters(unittest.TestCase):
-
     def get_fixture_path(self, name):
-        return os.path.join(os.path.dirname(__file__), 'fixtures', name)
+        return os.path.join(os.path.dirname(__file__), "fixtures", name)
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_vaneck_adapter_contract(self, mock_get):
         """
         Contract Test: Validates the VanEckAdapter against a saved local fixture.
         """
         # Mock the response from requests.get
-        fixture_path = self.get_fixture_path('vaneck_holdings.xlsx')
-        with open(fixture_path, 'rb') as f:
+        fixture_path = self.get_fixture_path("vaneck_holdings.xlsx")
+        with open(fixture_path, "rb") as f:
             mock_get.return_value.content = f.read()
-        
+
         adapter = VanEckAdapter(isin="IE000YYE6WK5")
         df = adapter.fetch_holdings(isin="IE000YYE6WK5")
 
         # Assert the contract
         self.assertIsInstance(df, pd.DataFrame)
         self.assertFalse(df.empty)
-        self.assertIn('name', df.columns)
-        self.assertIn('ticker', df.columns)
-        self.assertIn('weight_percentage', df.columns)
-        self.assertTrue(pd.api.types.is_numeric_dtype(df['weight_percentage']))
+        self.assertIn("name", df.columns)
+        self.assertIn("ticker", df.columns)
+        self.assertIn("weight_percentage", df.columns)
+        self.assertTrue(pd.api.types.is_numeric_dtype(df["weight_percentage"]))
 
-    @patch('requests.get')
+    @patch("requests.get")
     def test_ishares_adapter_contract(self, mock_get):
         """
         Contract Test: Validates the ISharesAdapter against a saved local fixture.
         """
         # Mock the response from requests.get
-        fixture_path = self.get_fixture_path('ishares_holdings.csv')
-        with open(fixture_path, 'r') as f:
+        fixture_path = self.get_fixture_path("ishares_holdings.csv")
+        with open(fixture_path, "r") as f:
             mock_get.return_value.text = f.read()
 
         adapter = ISharesAdapter()
@@ -49,10 +49,10 @@ class TestAdapters(unittest.TestCase):
         # Assert the contract
         self.assertIsInstance(df, pd.DataFrame)
         self.assertFalse(df.empty)
-        self.assertIn('name', df.columns)
-        self.assertIn('ticker', df.columns)
-        self.assertIn('weight_percentage', df.columns)
-        self.assertTrue(pd.api.types.is_numeric_dtype(df['weight_percentage']))
+        self.assertIn("name", df.columns)
+        self.assertIn("ticker", df.columns)
+        self.assertIn("weight_percentage", df.columns)
+        self.assertTrue(pd.api.types.is_numeric_dtype(df["weight_percentage"]))
 
     # @patch('requests.get')
     # def test_xtrackers_adapter_contract(self, mock_get):
@@ -76,5 +76,6 @@ class TestAdapters(unittest.TestCase):
     #     self.assertIn('weight_percentage', df.columns)
     #     self.assertTrue(pd.api.types.is_numeric_dtype(df['weight_percentage']))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

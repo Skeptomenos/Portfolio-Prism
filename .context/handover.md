@@ -1,34 +1,25 @@
-# 🤝 Handover: Pydantic Integration Complete
+# Handover: Phase 13 Complete (Aggregation Refactor)
 
-## 🏁 Previous Session Summary
-Completed TASK-005 (Pydantic Schemas for Core Data Structures).
+## Summary
+- **TASK-005:** Pydantic models integrated (state_manager.py, aggregation)
+- **TASK-006:** Monolithic aggregation.py refactored into modular package
 
-**Accomplishments:**
-- **TASK-005a:** Created `src/models/` package with Position, ETFHolding, ExposureRecord models.
-- **TASK-005b:** Integrated Position validation into `state_manager.py`.
-  - Added `_validate_positions()` for Pydantic validation
-  - Added `load_positions_as_models()` for typed Position objects
-  - Fixed NaN→None conversion with `_to_optional_str()` helper
-- **TASK-005c:** Integrated AggregatedExposure into `aggregation.py`.
-  - Replaced dict-based aggregation with `AggregatedExposure` model
-  - Uses `get_or_create_record()` and `add_indirect()` methods
-  - Final output via `to_dataframe()` with automatic portfolio % calculation
+## Key Deliverables
+- `src/core/aggregation/` - 6 modular files replacing 350-line monolith
+- `tests/test_aggregation_v2.py` - 13 unit tests covering all modules
+- All callers updated (`run_pipeline.py`, `test_aggregation.py`)
 
-## 📂 Key Files Modified
-- `src/data/state_manager.py` - Added validation + model loader
-- `src/core/aggregation.py` - Uses AggregatedExposure model
-- `docs/specs/tasks.md` - Updated task status
+## Metrics
+- **Tests:** 22 passed
+- **Lint:** 25 E402 (intentional), 1 E722 (known)
+- **Format:** Applied
 
-## ✅ Current Metrics
-- **Tests:** 9 passed (no regression)
-- **Lint:** Clean (ruff check/format passed)
-- **Type Checker Warnings:** ~25 pandas stub issues (expected, documented in PROJECT_LEARNINGS)
+## Files Changed (Uncommitted)
+- New: `src/core/aggregation/`, `tests/test_aggregation_v2.py`
+- Modified: `scripts/run_pipeline.py`, `tests/test_aggregation.py`
+- Deleted: `src/core/aggregation.py`
+- Updated: `CHANGELOG.md`, `PROJECT_LEARNINGS.md`, `tasks.md`
 
-## ⚠️ Next Steps (Ready to Execute)
-1. **TASK-006:** Refactor `aggregation.py` into submodules:
-   - 006a: Extract `process_direct_holdings()` to `src/core/aggregation/direct.py`
-   - 006b: Extract classification logic to `src/core/aggregation/classification.py`
-   - 006c: Extract tiered enrichment to `src/core/aggregation/enrichment.py`
-   - 006d: Extract aggregation logic to `src/core/aggregation/grouping.py`
-   - 006e: Create clean public API in `__init__.py`
-2. **TASK-010:** Add integration tests
+## Next Steps
+1. **TASK-008:** Add type hints to resolve type checker warnings
+2. **TASK-010a/b:** Create integration test fixtures

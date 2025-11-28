@@ -19,4 +19,4 @@ print("\nColumns found:")
 print(df.columns.tolist())
 
 print("\nFirst 5 rows (Ticker, Name, Weight):")
-print(df[['Emittententicker', 'Name', 'Gewichtung (%)']].head())
+print(df[["Emittententicker", "Name", "Gewichtung (%)"]].head())

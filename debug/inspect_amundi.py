@@ -13,11 +13,14 @@ try:
     print("Columns:", df.columns.tolist())
     print("First 5 rows:")
     print(df.head().to_string())
-    
+
     # Look for AstraZeneca
-    astra = df[df.astype(str).apply(lambda x: x.str.contains('ASTRA', case=False, na=False)).any(axis=1)]
+    astra = df[
+        df.astype(str)
+        .apply(lambda x: x.str.contains("ASTRA", case=False, na=False))
+        .any(axis=1)
+    ]
     print("\n--- AstraZeneca Entry ---")
     print(astra.to_string())
 except Exception as e:
     print(f"Failed: {e}")
-

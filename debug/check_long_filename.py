@@ -12,10 +12,10 @@ try:
     print(df.head())
 except Exception as e:
     print(f"Default Failed: {e}")
-    
+
 try:
     # Try openpyxl
-    df = pd.read_excel(file_path, engine='openpyxl')
+    df = pd.read_excel(file_path, engine="openpyxl")
     print("Success! (openpyxl)")
 except Exception as e:
     print(f"openpyxl Failed: {e}")

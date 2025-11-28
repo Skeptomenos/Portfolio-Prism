@@ -16,6 +16,7 @@ XTRACKERS_ETF_DATA = {
 }
 OUTPUT_DIR = "outputs"
 
+
 class XtrackersAdapter:
     """
     Adapter for fetching ETF holdings data from Xtrackers (DWS).
@@ -48,39 +49,54 @@ class XtrackersAdapter:
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
-            logger.info("3. Successfully downloaded CSV data. Parsing into DataFrame...")
+            logger.info(
+                "3. Successfully downloaded CSV data. Parsing into DataFrame..."
+            )
             # Use StringIO to treat the CSV string as a file for pandas
             csv_data = io.StringIO(response.text)
-            
+
             # Read the CSV data, specifying the delimiter
-            holdings_df = pd.read_csv(csv_data, sep=';')
+            holdings_df = pd.read_csv(csv_data, sep=";")
 
             logger.info(f"4. Successfully parsed {len(holdings_df)} holdings.")
-            
+
             # --- Data Cleaning and Standardization ---
-            holdings_df.rename(columns={
-                'Constituent Name': 'name',
-                'Constituent ISIN': 'isin',
-                'Constituent Weighting': 'weight_percentage'
-            }, inplace=True)
-            
+            holdings_df.rename(
+                columns={
+                    "Constituent Name": "name",
+                    "Constituent ISIN": "isin",
+                    "Constituent Weighting": "weight_percentage",
+                },
+                inplace=True,
+            )
+
             # Fill missing names with ISIN, or "Unknown Asset" if ISIN is also missing
-            holdings_df['name'] = holdings_df['name'].fillna(holdings_df['isin']).fillna("Unknown Asset")
-            
+            holdings_df["name"] = (
+                holdings_df["name"].fillna(holdings_df["isin"]).fillna("Unknown Asset")
+            )
+
             # Auto-Scale Weights: Check if weights are decimal (sum ~ 1.0) or percentage (sum ~ 100.0)
-            weight_sum = holdings_df['weight_percentage'].sum()
+            weight_sum = holdings_df["weight_percentage"].sum()
             if weight_sum <= 1.5:
-                logger.info(f"   - Detected decimal weights (Sum={weight_sum:.4f}). Scaling by 100.")
-                holdings_df['weight_percentage'] = holdings_df['weight_percentage'] * 100
+                logger.info(
+                    f"   - Detected decimal weights (Sum={weight_sum:.4f}). Scaling by 100."
+                )
+                holdings_df["weight_percentage"] = (
+                    holdings_df["weight_percentage"] * 100
+                )
             else:
-                logger.info(f"   - Detected percentage weights (Sum={weight_sum:.2f}). No scaling needed.")
-            
+                logger.info(
+                    f"   - Detected percentage weights (Sum={weight_sum:.2f}). No scaling needed."
+                )
+
             # Clip negative weights to 0.0 to ensure validation compliance
-            holdings_df['weight_percentage'] = holdings_df['weight_percentage'].clip(lower=0.0)
-            
+            holdings_df["weight_percentage"] = holdings_df["weight_percentage"].clip(
+                lower=0.0
+            )
+
             # Ensure ticker column exists (nullable in schema)
-            if 'ticker' not in holdings_df.columns:
-                holdings_df['ticker'] = None
+            if "ticker" not in holdings_df.columns:
+                holdings_df["ticker"] = None
 
             return holdings_df
 
@@ -91,12 +107,16 @@ class XtrackersAdapter:
             logger.error(f"Failed to parse CSV data for {isin}. Details: {e}")
             return pd.DataFrame()
         except Exception as e:
-            logger.error(f"An unexpected error occurred in XtrackersAdapter for {isin}: {e}")
+            logger.error(
+                f"An unexpected error occurred in XtrackersAdapter for {isin}: {e}"
+            )
             return pd.DataFrame()
 
+
 # --- Example Usage (for testing) ---
-if __name__ == '__main__':
+if __name__ == "__main__":
     import os
+
     adapter = XtrackersAdapter()
     # Use the ISIN for XDEM (Xtrackers MSCI World Momentum ETF)
     xdem_holdings = adapter.fetch_holdings("IE00BL25JP72")
