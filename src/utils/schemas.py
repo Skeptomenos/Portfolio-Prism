@@ -1,5 +1,5 @@
 # phases/shared/schemas.py
-import pandera as pa
+import pandera.pandas as pa
 from pandera.typing import Series
 from typing import Optional
 

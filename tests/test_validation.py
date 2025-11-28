@@ -1,6 +1,7 @@
 # tests/test_validation.py
 import pandas as pd
-import pandera as pa
+import pandera.pandas as pa
+from pandera import errors as pa_errors
 from src.utils.schemas import HoldingsSchema
 
 import unittest
@@ -18,13 +19,13 @@ class TestValidation(unittest.TestCase):
         )
         try:
             HoldingsSchema.validate(valid_df)
-        except pa.errors.SchemaError as e:
+        except pa_errors.SchemaError as e:
             self.fail(f"Validation failed unexpectedly on valid data: {e}")
 
     def test_validation_failure_missing_column(self):
         """Tests that a DataFrame with a missing column fails validation."""
         invalid_df = pd.DataFrame({"name": ["Apple Inc."], "weight_percentage": [10.5]})
-        with self.assertRaises(pa.errors.SchemaError):
+        with self.assertRaises(pa_errors.SchemaError):
             HoldingsSchema.validate(invalid_df)
 
     def test_validation_failure_wrong_dtype(self):
@@ -36,7 +37,7 @@ class TestValidation(unittest.TestCase):
                 "weight_percentage": ["should_be_float"],
             }
         )
-        with self.assertRaises(pa.errors.SchemaError):
+        with self.assertRaises(pa_errors.SchemaError):
             HoldingsSchema.validate(invalid_df)
 
     def test_validation_failure_negative_weight(self):
@@ -44,7 +45,7 @@ class TestValidation(unittest.TestCase):
         invalid_df = pd.DataFrame(
             {"name": ["Apple Inc."], "ticker": ["AAPL"], "weight_percentage": [-5.0]}
         )
-        with self.assertRaises(pa.errors.SchemaError):
+        with self.assertRaises(pa_errors.SchemaError):
             HoldingsSchema.validate(invalid_df)
 
 

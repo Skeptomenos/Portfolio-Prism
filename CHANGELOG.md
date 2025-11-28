@@ -26,6 +26,9 @@
 ### Fixed
 - **Ruff Format**: Applied `ruff format .` across 42 files for consistent code style.
 - **Integration Test Mock**: Fixed `finalize_and_save` mock signature to properly handle `AggregatedExposure` objects.
+- **Pydantic v2 Deprecation**: Updated `src/models/holdings.py` to use `ConfigDict` instead of deprecated `class Config`.
+- **Pandera Import Warnings**: Updated imports to `import pandera.pandas as pa` to eliminate FutureWarning.
+- **Bare Except Anti-Pattern**: Fixed E722 in `scripts/visualize_portfolio.py` by using specific exception types.
 
 ### Removed
 - **Legacy Aggregation**: Deleted monolithic `src/core/aggregation.py` after successful migration.

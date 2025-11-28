@@ -73,3 +73,37 @@
 - [ ] **TASK-008:** Add type hints to resolve type checker warnings.
     - **Context/Constraints:** Many pandas type stub issues. Focus on function signatures.
     - **Status:** Pending (deferred until after TASK-005/006)
+
+## Phase 3: Code Quality & Cleanup
+
+### TASK-011: Fix Pydantic v2 Deprecation Warnings
+- [x] **TASK-011a:** Update `src/models/holdings.py` to use `ConfigDict` instead of `class Config`.
+    - **Context:** Pydantic v2 deprecation warning in test output.
+    - **Status:** Completed 2025-11-28.
+- [x] **TASK-011b:** Verify no other models use deprecated `class Config` pattern.
+    - **Status:** Completed 2025-11-28. No other models affected.
+- **Status:** ✅ Completed
+- **Estimated Time:** 15 mins (actual: 5 mins)
+
+### TASK-012: Fix Pandera Import Warnings
+- [x] **TASK-012:** Update pandera imports from `import pandera as pa` to `import pandera.pandas as pa`.
+    - **Files:** `scripts/run_pipeline.py`, `tests/test_validation.py`, `src/utils/schemas.py`
+    - **Context:** FutureWarning in test output about deprecated top-level imports.
+    - **Status:** Completed 2025-11-28. Also updated error imports to `from pandera import errors`.
+- **Status:** ✅ Completed
+- **Estimated Time:** 10 mins (actual: 10 mins)
+
+### TASK-013: Fix Bare Except Anti-Pattern
+- [x] **TASK-013:** Replace bare `except:` with `except (OSError, ValueError):` in `scripts/visualize_portfolio.py:16`.
+    - **Context:** E722 ruff warning. Bare except catches KeyboardInterrupt/SystemExit.
+    - **Status:** Completed 2025-11-28.
+- **Status:** ✅ Completed
+- **Estimated Time:** 5 mins (actual: 2 mins)
+
+## Backlog (Future)
+
+### TASK-014: Vanguard Adapter
+- [ ] **TASK-014:** Create adapter for Vanguard ETFs.
+    - **Context:** Auto-generated from ISIN DE0007500001 on 2025-11-23.
+    - **Priority:** Low
+- **Status:** Backlog

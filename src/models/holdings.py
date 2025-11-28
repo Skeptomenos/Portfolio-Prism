@@ -5,7 +5,7 @@ Defines the structure for holdings data returned by ETF adapters,
 through classification and enrichment stages.
 """
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from typing import Optional, Literal
 
 
@@ -26,6 +26,8 @@ class ETFHolding(BaseModel):
         exchange: Exchange name from provider
     """
 
+    model_config = ConfigDict(extra="allow")
+
     name: str
     ticker: Optional[str] = None
     raw_ticker: Optional[str] = None
@@ -33,11 +35,6 @@ class ETFHolding(BaseModel):
     isin: Optional[str] = None
     location: Optional[str] = None
     exchange: Optional[str] = None
-
-    class Config:
-        """Pydantic configuration."""
-
-        extra = "allow"  # Allow extra fields from adapters
 
 
 class ClassifiedHolding(ETFHolding):

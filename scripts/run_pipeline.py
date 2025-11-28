@@ -15,7 +15,8 @@ from src.utils.logging_config import get_logger
 from src.adapters.registry import AdapterRegistry, AdapterNotImplementedError
 from src.utils.schemas import HoldingsSchema
 from src.core.direct_reporting import generate_direct_holdings_report
-import pandera as pa
+import pandera.pandas as pa
+from pandera import errors as pa_errors
 from datetime import datetime
 from src.utils.metrics import tracker
 from src.core.health import health
@@ -225,7 +226,7 @@ def run_pipeline():
             logger.warning(f"Skipping {etf['name']}: {e}")
             failed_etfs.append((isin, f"Not Implemented: {e} (Added to Roadmap)"))
             tracker.increment_system_metric("etfs_failed")
-        except pa.errors.SchemaError as e:
+        except pa_errors.SchemaError as e:
             logger.error(f"Data contract validation failed for {etf['name']}: {e}")
             failed_etfs.append((isin, f"Validation Error: {e.args[0]}"))
             tracker.increment_system_metric("etfs_failed")
@@ -254,6 +255,7 @@ def run_pipeline():
 
     # --- Phase 6: Visualization ---
     from scripts.visualize_portfolio import run_visualization
+
     run_visualization()
 
     # 7. Harvest New Securities (Auto-Learning)

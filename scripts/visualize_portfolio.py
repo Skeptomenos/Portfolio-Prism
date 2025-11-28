@@ -13,7 +13,7 @@ def setup_style():
     # Use a built-in style if available, or fall back to default
     try:
         plt.style.use("seaborn-v0_8-darkgrid")
-    except:
+    except (OSError, ValueError):
         plt.style.use("ggplot")
 
     plt.rcParams["font.family"] = "sans-serif"
