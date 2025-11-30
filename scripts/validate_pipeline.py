@@ -12,7 +12,6 @@ Usage:
 import pandas as pd
 import sys
 from pathlib import Path
-from typing import Dict
 
 # Paths
 TRUTH_PATH = Path("data/true_data/ground_truth_merged.csv")

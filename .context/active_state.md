@@ -1,15 +1,14 @@
 # 🟢 Active Session State
-**Objective:** Handover (TASK-015 Complete)
-**Status:** Done
+**Objective:** Awaiting New Task
+**Status:** Idle
 
 ## 🛡️ Applied Constraints
-- **Strict I/O Separation:** Enforced.
-- **Manual Injection:** Implemented and Verified.
+- None active
 
 ## 📝 Current Focus
-*   **Phase:** Phase 4 (Deliver & Document)
-*   **Ref:** `docs/specs/tasks.md`
+*   **Phase:** N/A
+*   **Ref:** See `docs/specs/tasks.md` for backlog
 
 ## 🧠 Context & Learnings
-*   **Critical:** Trade Republic "Account Statement" PDFs are insufficient for full position calculation (missing quantities).
-*   **Workaround:** `data/inputs/manual_holdings/manual_positions.csv` is now a critical part of the pipeline input.
+*   System verified working (23/23 tests pass, validation passes)
+*   Lint: 25 intentional E402 errors remain (sys.path requirements)

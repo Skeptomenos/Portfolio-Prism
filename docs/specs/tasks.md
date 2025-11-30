@@ -28,27 +28,39 @@
 ## Phase 1.5: Pipeline Architecture Fix (Critical Data Flow)
 
 > **Plan Reference:** `docs/plans/pipeline_architecture_fix.md`
+> **Status:** ✅ Completed via TASK-015 (2025-11-29)
 
 ### Phase 1: Fix Data Flow Architecture
-- [ ] **TASK-P1-001:** Update `state_manager.py` to read from calculated holdings.
+- [x] **TASK-P1-001:** Update `state_manager.py` to read from calculated holdings.
     - **Change:** Point `HOLDINGS_PATH` to `data/working/calculated_holdings.csv`.
-- [ ] **TASK-P1-002:** Update `parse_pdfs_to_csv.py` output path.
+    - **Status:** Completed as part of TASK-015a.
+- [x] **TASK-P1-002:** Update `parse_pdfs_to_csv.py` output path.
     - **Change:** Output to `data/working/calculated_holdings.csv`.
-- [ ] **TASK-P1-003:** Create unified pipeline entry point (`scripts/run_full_pipeline.py`).
+    - **Status:** Completed as part of TASK-015.
+- [x] **TASK-P1-003:** Create unified pipeline entry point (`scripts/run_full_pipeline.py`).
+    - **Status:** Completed as part of TASK-015e.
 
 ### Phase 2: Fix PDF Parser & Position Logic
-- [ ] **TASK-P2-001:** Verify PDF parser extracts all transactions (dry run).
-- [ ] **TASK-P2-002:** Fix position calculation for sold positions (exclude 0 qty).
-- [ ] **TASK-P2-003:** Handle missing transactions (if parser misses any).
+- [x] **TASK-P2-001:** Verify PDF parser extracts all transactions (dry run).
+    - **Status:** Completed. Parser works; missing data is source limitation (not parser bug).
+- [x] **TASK-P2-002:** Fix position calculation for sold positions (exclude 0 qty).
+    - **Status:** Completed as part of TASK-015.
+- [x] **TASK-P2-003:** Handle missing transactions (if parser misses any).
+    - **Status:** Completed via Manual Injection workaround (`manual_positions.csv`).
 
 ### Phase 3: Fix Ticker Mappings
 - [ ] **TASK-P3-001:** Fix TKMS ticker in `asset_universe.csv`.
+    - **Status:** Deferred. Small position, low priority.
 - [ ] **TASK-P3-002:** Investigate/Fix delisted stocks (TAAT, Cresco).
+    - **Status:** Deferred. Small positions, low priority.
 
 ### Phase 4: Documentation & Cleanup
-- [ ] **TASK-P4-001:** Update `SYSTEM_FLOW.md` with correct architecture.
+- [x] **TASK-P4-001:** Update `SYSTEM_FLOW.md` with correct architecture.
+    - **Status:** Completed 2025-11-29.
 - [ ] **TASK-P4-002:** Remove misleading `data/true_data/portfolio_holdings.csv`.
-- [ ] **TASK-P4-003:** Update README with correct usage instructions.
+    - **Status:** Deferred. File serves as reference/backup.
+- [x] **TASK-P4-003:** Update README with correct usage instructions.
+    - **Status:** Completed 2025-11-29.
 
 ## Phase 2: Technical Debt & Optimization
 

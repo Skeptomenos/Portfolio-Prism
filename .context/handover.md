@@ -1,28 +1,22 @@
-# Handover: Pipeline Validation & Data Fix (TASK-015)
+# Handover: Documentation Hygiene (2025-11-30)
 
 ## Status: ✅ COMPLETE
 
-The Data Pipeline validation logic has been fixed, and a critical data gap in the PDF input has been bridged using a manual workaround.
+Reviewed project reviews, verified system state, performed cleanup.
 
 ## Key Changes
-1.  **Architecture:** Removed `state_manager.py` fallback logic. Pipeline no longer cheats by reading the truth file.
-2.  **Validation:** `scripts/validate_pipeline.py` now compares Direct Holdings Quantities against `data/true_data/ground_truth_merged.csv`.
-3.  **Manual Injection:** `scripts/parse_pdfs_to_csv.py` now checks for `data/inputs/manual_holdings/manual_positions.csv` and merges it with parsed results. This fixes the missing Microsoft, Amazon, etc. positions.
+1.  **Lint:** Auto-fixed 3 ruff errors (unused imports in pipeline scripts).
+2.  **tasks.md:** Updated Phase 1.5 to reflect completed status from TASK-015.
+3.  **Archive:** Moved stale `PROJECT_REVIEW_2025-11-30.md` to `docs/archive/`.
 
-## Operational Notes
-*   **Running the Pipeline:**
-    ```bash
-    python -m scripts.run_full_pipeline
-    ```
-*   **Running Validation:**
-    ```bash
-    python -m scripts.validate_pipeline
-    ```
-    *   *Expectation:* "VALIDATION PASSED" (Quantities match). Ignore Value Drift warnings.
+## System Verification
+*   **Tests:** 23/23 passing
+*   **Validation:** PASSED (Quantities Match)
+*   **Lint:** 25 errors (all intentional E402)
 
-## Known Issues (Market Data)
-*   Some assets (TKMS, Cresco Labs, TAAT) are failing to get live prices from Yahoo Finance ("Delisted" or "No Data"). This causes Value Drift warnings but does not break the pipeline.
+## Known Deferred Items
+*   TKMS/Cresco/TAAT ticker issues (small positions, low priority)
+*   TASK-014: Vanguard Adapter (backlog)
 
 ## Next Steps
-*   **TASK-014 (Backlog):** Implement Vanguard ETF Adapter.
-*   **Future:** If better PDFs (Depotauszug) become available, update the parser to remove the manual injection dependency.
+*   System is stable. Ready for new feature work or backlog items.

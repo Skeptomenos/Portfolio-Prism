@@ -12,8 +12,6 @@ Usage:
 """
 
 import sys
-import logging
-from pathlib import Path
 from src.utils.logging_config import get_logger
 
 # Import steps
