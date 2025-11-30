@@ -67,5 +67,11 @@ tr_pdf_exports/
 docs/archive/*
 !docs/archive/.gitkeep
 
-docs/reference/research/*
-!docs/reference/research/.gitkeep
+
+# Scratchpad / Debug Scripts
+debug/repro_parser.py
+debug/inspect_pdf_text.py
+
+# Loose Data Files in Inputs
+data/inputs/*.csv
+*.bak
