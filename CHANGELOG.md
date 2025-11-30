@@ -1,5 +1,23 @@
 # Changelog
 
+## [Phase 15] - 2025-11-30
+
+### Added
+- **Streamlit Dashboard**: Implemented a full-featured web-based GUI for portfolio analysis with 4 tabs:
+    - **Portfolio X-Ray**: Overview with KPIs (Total Value, Positions, Unique Assets), interactive Plotly charts (Top 10 Holdings bar chart, Asset Allocation pie chart), and detailed holdings table
+    - **Holdings Analysis**: Dual-mode analysis with ETF Explorer (forward drill-down into ETF holdings) and Stock Lookup (reverse search showing consolidated exposure across direct + ETF sources)
+    - **Data Manager**: Interactive editor for `config/asset_universe.csv` with automatic timestamped backups, duplicate validation, and integration with error "Fix" buttons
+    - **Pipeline Health**: Real-time metrics dashboard showing ETFs processed, ISINs resolved, resolution failures, ETF stats table, and actionable error list
+- **Dashboard Utilities**: Created `src/dashboard/utils.py` with cached data loading functions for all pipeline outputs
+- **Dashboard Launcher**: Added `run_dashboard.sh` script for easy dashboard startup
+
+### Changed
+- **Dependencies**: Added `streamlit>=1.30.0` and `plotly>=5.18.0` to `requirements.txt`
+- **Error Workflow**: Implemented end-to-end "Error → Fix → Save → Verify" flow connecting Pipeline Health errors to Data Manager fixes via session state
+
+### Fixed
+- **Mode Calculation**: Fixed KeyError when calculating mode on empty/null Series in ETF Explorer by checking length before accessing index
+
 ## [Phase 14] - 2025-11-29
 
 ### Fixed

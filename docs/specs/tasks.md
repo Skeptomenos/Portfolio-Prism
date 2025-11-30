@@ -166,10 +166,41 @@
 - [x] **TASK-015e:** Verify End-to-End
     - **Action:** Run `scripts/run_full_pipeline.py` and confirm clean execution.
 
-## Backlog (Future)
+## Phase 3: Dashboard Implementation (Streamlit)
 
-### TASK-014: Vanguard Adapter
-- [ ] **TASK-014:** Create adapter for Vanguard ETFs.
-    - **Context:** Auto-generated from ISIN DE0007500001 on 2025-11-23.
-    - **Priority:** Low
-- **Status:** Backlog
+> **Plan Reference:** `docs/plans/dashboard_phase_1_2_implementation.md`
+
+### TASK-DASH-001: Environment Setup (Phase 1)
+- [x] **TASK-DASH-001a:** Update `requirements.txt` with `streamlit` and `plotly`.
+- [x] **TASK-DASH-001b:** Create `run_dashboard.sh` launcher script.
+- [x] **TASK-DASH-001c:** Install dependencies and verify imports.
+
+### TASK-DASH-002: Dashboard Skeleton (Phase 2)
+- [x] **TASK-DASH-002a:** Create `src/dashboard/` directory structure.
+- [x] **TASK-DASH-002b:** Implement `src/dashboard/utils.py` for data loading.
+- [x] **TASK-DASH-002c:** Implement `src/dashboard/app.py` with tab layout.
+
+### TASK-DASH-003: Pipeline Health Tab (Phase 2)
+- [x] **TASK-DASH-003a:** Create `src/dashboard/tabs/pipeline_health.py`.
+- [x] **TASK-DASH-003b:** Implement Metrics Display (KPIs).
+- [x] **TASK-DASH-003c:** Implement ETF Stats Table.
+- [x] **TASK-DASH-003d:** Implement Error Reporting Table.
+
+### TASK-DASH-004: Verification (Phase 2)
+- [x] **TASK-DASH-004:** Launch dashboard and verify data matches `pipeline_health.json`.
+
+### TASK-DASH-005: Holdings Analysis Tab (Phase 3)
+- [x] **TASK-DASH-005a:** Implement `load_direct_holdings` and `load_holdings_breakdown` in `utils.py`.
+- [x] **TASK-DASH-005b:** Create `src/dashboard/tabs/holdings_analysis.py`.
+- [x] **TASK-DASH-005c:** Implement ETF Explorer logic.
+- [x] **TASK-DASH-005d:** Implement Stock Lookup logic.
+- [x] **TASK-DASH-005e:** Wire up Tab 2 in `app.py`.
+
+### TASK-DASH-006: Data Manager Tab (Phase 4)
+- [x] **TASK-DASH-006a:** Implement `load_asset_universe` in `utils.py`.
+- [x] **TASK-DASH-006b:** Create `src/dashboard/tabs/data_manager.py`.
+- [x] **TASK-DASH-006c:** Implement Universe Editor with Backup/Save logic.
+- [x] **TASK-DASH-006d:** Wire up Tab 3 in `app.py`.
+- [x] **TASK-DASH-006e:** Connect "Fix" button from Health Tab to Data Manager.
+
+## Backlog (Future)

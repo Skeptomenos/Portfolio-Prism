@@ -1,22 +1,29 @@
-# Handover: Documentation Hygiene (2025-11-30)
+# Handover: Dashboard Implementation Complete (2025-11-30)
 
 ## Status: ✅ COMPLETE
 
-Reviewed project reviews, verified system state, performed cleanup.
+Implemented full Streamlit dashboard (Phases 1-5).
 
 ## Key Changes
-1.  **Lint:** Auto-fixed 3 ruff errors (unused imports in pipeline scripts).
-2.  **tasks.md:** Updated Phase 1.5 to reflect completed status from TASK-015.
-3.  **Archive:** Moved stale `PROJECT_REVIEW_2025-11-30.md` to `docs/archive/`.
+1. **Dashboard**: 4-tab Streamlit app (`src/dashboard/`)
+   - Portfolio X-Ray (KPIs + charts)
+   - Holdings Analysis (ETF drill-down + stock lookup)
+   - Data Manager (asset universe editor)
+   - Pipeline Health (metrics + errors)
+2. **Dependencies**: Added streamlit, plotly
+3. **Integration**: Error→Fix workflow via session state
 
-## System Verification
-*   **Tests:** 23/23 passing
-*   **Validation:** PASSED (Quantities Match)
-*   **Lint:** 25 errors (all intentional E402)
+## Launch
+```bash
+./run_dashboard.sh
+```
 
-## Known Deferred Items
-*   TKMS/Cresco/TAAT ticker issues (small positions, low priority)
-*   TASK-014: Vanguard Adapter (backlog)
+## System Status
+- Tests: 23/23 passing
+- Dashboard: All tabs functional
+- Lint: 25 E402 (intentional)
 
 ## Next Steps
-*   System is stable. Ready for new feature work or backlog items.
+- Optional: Add Portfolio X-Ray charts (Sector, Geography)
+- Optional: Pipeline execution buttons in Health tab
+- Backlog: Vanguard adapter (TASK-014)

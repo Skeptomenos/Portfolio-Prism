@@ -75,3 +75,6 @@ debug/inspect_pdf_text.py
 # Loose Data Files in Inputs
 data/inputs/*.csv
 *.bak
+
+.gemini/
+gha-creds-*.json

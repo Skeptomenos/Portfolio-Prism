@@ -49,7 +49,7 @@ def run_aggregation(
     Returns:
         DataFrame with aggregated true exposure per security
     """
-    output_filepath = TRUE_EXPOSURE_REPORT
+    output_filepath = str(TRUE_EXPOSURE_REPORT)
 
     if direct_positions.empty and etf_positions.empty:
         logger.warning("No positions found. Exiting aggregation.")
@@ -89,18 +89,68 @@ def run_aggregation(
             holdings = enrich_etf_holdings(holdings, etf_market_value)
             holdings = calculate_indirect_values(holdings, etf_market_value)
 
+            # Add Parent Info for Lineage/Drill-down
+            holdings["parent_isin"] = etf_isin
+            holdings["parent_name"] = etf["name"]
+            holdings["source"] = "ETF"
+
             # Debug: log large holdings
             _log_large_holdings(holdings, etf_isin, etf["name"])
 
             # Accumulate
             all_holdings = pd.concat([all_holdings, holdings], ignore_index=True)
 
-    # Debug: save intermediate results
-    if not all_holdings.empty:
+    # Save detailed breakdown (Direct + Indirect)
+    breakdown_df = all_holdings.copy()
+
+    # Add Direct Holdings to breakdown
+    if not direct_positions.empty:
+        direct_rows = direct_positions.copy()
+        direct_rows["parent_isin"] = "DIRECT"
+        direct_rows["parent_name"] = "Direct Portfolio"
+        direct_rows["source"] = "Direct"
+        # Map market_value to 'indirect' to share the "Value" column concept
+        direct_rows["indirect"] = direct_rows["market_value"]
+        # Direct holdings effectively have 100% weight of themselves, but usually weight refers to parent
+        direct_rows["weight_percentage"] = 0.0  # Not really applicable in the same way
+
+        breakdown_df = pd.concat([breakdown_df, direct_rows], ignore_index=True)
+
+    if not breakdown_df.empty:
         try:
-            all_holdings.to_csv("outputs/debug_all_holdings.csv", index=False)
+            # Select and rename columns for clarity
+            cols_to_keep = [
+                "parent_isin",
+                "parent_name",
+                "source",
+                "isin",
+                "name",
+                "asset_class",
+                "sector",
+                "geography",
+                "weight_percentage",
+                "indirect",
+            ]
+            # Ensure columns exist (direct might miss some)
+            for col in cols_to_keep:
+                if col not in breakdown_df.columns:
+                    breakdown_df[col] = None
+
+            output_breakdown = breakdown_df[cols_to_keep].rename(
+                columns={
+                    "isin": "child_isin",
+                    "name": "child_name",
+                    "indirect": "value_eur",
+                    "weight_percentage": "weight_percent",
+                }
+            )
+
+            output_breakdown.to_csv("outputs/holdings_breakdown.csv", index=False)
+            logger.info(
+                "Saved detailed holdings breakdown to outputs/holdings_breakdown.csv"
+            )
         except Exception as e:
-            logger.debug(f"Could not save debug file: {e}")
+            logger.error(f"Failed to save breakdown CSV: {e}")
 
     # Step 3: Aggregate all indirect holdings
     aggregate_indirect_holdings(all_holdings, exposures)

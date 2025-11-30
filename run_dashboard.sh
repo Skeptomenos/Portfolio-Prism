@@ -1,3 +1,4 @@
 #!/bin/bash
+cd "$(dirname "$0")"
 source venv/bin/activate
-streamlit run src/dashboard/app.py
+streamlit run src/dashboard/app.py --server.port 8501

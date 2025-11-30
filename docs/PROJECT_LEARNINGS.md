@@ -108,3 +108,10 @@
 - **Test Before Delete:** Never delete old code until new code passes ALL existing tests + new unit tests. Integration test comparing old vs new output is critical proof.
 - **AggregatedExposure Model:** Using Pydantic model with `get_or_create_record()` pattern simplifies aggregation logic. Records stored as list, accessed via `get_record(isin)` method.
 - **Tiered Enrichment:** Only resolve ISINs for holdings >1% weight. Reduces API calls by 80%+ while maintaining 95%+ value coverage. Minor holdings use fallback grouping.
+
+### Phase 15: Dashboard Development (2025-11-30)
+- **Streamlit State Management:** Session state (`st.session_state`) enables cross-tab communication (e.g., error "Fix" button → Data Manager). Critical for user flows spanning multiple tabs.
+- **Safe Mode Calculation:** Always check `len(series.mode()) > 0` before accessing `[0]`. Empty Series from all-null columns raises KeyError, not handled by `.empty` check.
+- **Cached Data Loading:** Use `@st.cache_data` decorator on all file I/O functions. Prevents re-reading CSVs/JSON on every widget interaction. Clear cache after saves: `st.cache_data.clear()`.
+- **Plotly over Matplotlib:** For web dashboards, Plotly provides interactivity (zoom, hover, filter) out-of-the-box. Matplotlib static images lack these UX benefits.
+- **Incremental Implementation:** Build dashboards tab-by-tab with placeholders for future tabs. Allows iterative deployment and user feedback before full completion.

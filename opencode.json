@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LiteLLM Proxy",
+      "options": {
+        "baseURL": "http://localhost:4000/v1"
+      },
+      "models": {
+        "vertex-ai/claude-opus-4-5": {
+          "name": "Claude Opus 4.5 (Vertex AI)"
+        }
+      }
+    }
+  }
+}

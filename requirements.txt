@@ -1,4 +1,3 @@
-pandas
 python-dotenv
 requests
 beautifulsoup4
@@ -9,4 +8,8 @@ selenium-wire
 cryptography
 pandera
 python-calamine
-yfinancetqdm
+yfinance
+tqdm
+streamlit>=1.30.0
+plotly>=5.18.0
+pandas>=2.0.0
