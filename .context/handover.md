@@ -1,27 +1,28 @@
-# Handover: TASK-008e Complete (Test Type Annotations)
+# Handover: Pipeline Validation & Data Fix (TASK-015)
 
-## Summary
-- **TASK-008e:** Added type annotations to all 6 test files
-- **Test Suite:** 23/23 passing
-- **Lint:** Clean after ruff auto-fix
+## Status: ✅ COMPLETE
 
-## Key Deliverables
-- All test methods now have `-> None` return type annotations
-- Module and class docstrings added to test files
-- Imports organized (stdlib, third-party, local)
+The Data Pipeline validation logic has been fixed, and a critical data gap in the PDF input has been bridged using a manual workaround.
 
-## Remaining Backlog
-- **TASK-014:** Vanguard Adapter (Low Priority)
+## Key Changes
+1.  **Architecture:** Removed `state_manager.py` fallback logic. Pipeline no longer cheats by reading the truth file.
+2.  **Validation:** `scripts/validate_pipeline.py` now compares Direct Holdings Quantities against `data/true_data/ground_truth_merged.csv`.
+3.  **Manual Injection:** `scripts/parse_pdfs_to_csv.py` now checks for `data/inputs/manual_holdings/manual_positions.csv` and merges it with parsed results. This fixes the missing Microsoft, Amazon, etc. positions.
 
-## Files Changed This Session
-- `tests/test_*.py` - 6 files with type annotations
-- `docs/specs/tasks.md` - Marked TASK-008e complete
-- `.context/history/2025-11-28_TestTypeAnnotations.md` - Archived state
+## Operational Notes
+*   **Running the Pipeline:**
+    ```bash
+    python -m scripts.run_full_pipeline
+    ```
+*   **Running Validation:**
+    ```bash
+    python -m scripts.validate_pipeline
+    ```
+    *   *Expectation:* "VALIDATION PASSED" (Quantities match). Ignore Value Drift warnings.
 
-## Known Type Checker Issues (Not Bugs)
-- pandas-stubs incomplete for `.iloc` access (false positives)
-- Type checker cannot resolve `src.core.aggregation.*` imports (works at runtime)
+## Known Issues (Market Data)
+*   Some assets (TKMS, Cresco Labs, TAAT) are failing to get live prices from Yahoo Finance ("Delisted" or "No Data"). This causes Value Drift warnings but does not break the pipeline.
 
 ## Next Steps
-1. Address TASK-014 (Vanguard) if needed
-2. Consider adding edge case tests
+*   **TASK-014 (Backlog):** Implement Vanguard ETF Adapter.
+*   **Future:** If better PDFs (Depotauszug) become available, update the parser to remove the manual injection dependency.

@@ -15,7 +15,6 @@ from src.utils.logging_config import get_logger
 from src.adapters.registry import AdapterRegistry, AdapterNotImplementedError
 from src.utils.schemas import HoldingsSchema
 from src.core.direct_reporting import generate_direct_holdings_report
-import pandera.pandas as pa
 from pandera import errors as pa_errors
 from datetime import datetime
 from src.utils.metrics import tracker

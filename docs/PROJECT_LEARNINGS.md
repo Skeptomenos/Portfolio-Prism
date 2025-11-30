@@ -97,7 +97,12 @@
 - **E402 Import Order:** When `sys.path.insert()` is required before imports, E402 is acceptable technical debt. **Note:** 25 remaining E402 errors are intentional for project structure.
 - **Linter as Gate:** Running `ruff check .` before commit catches issues early. Integrate into CI/CD.
 
-### Phase 13: Aggregation Refactor (2025-11-28)
+### Phase 14: Validation & Data Integrity (2025-11-29)
+- **Input Data Limitations**: The Trade Republic "Account Statement" (Kontoauszug) PDF is a Cash Journal, not a Portfolio Statement. It often omits share quantities for "Direct Buy" (Direktkauf) transactions, listing only the Euro amount. **Rule:** Do not assume "Account Statements" contain position data. Use "Securities Account Statement" (Depotauszug) or "Order Confirmations" (Abrechnung) if possible.
+- **Validation Authority**: Never allow the production pipeline to "fallback" to reading the validation/ground-truth file when input is missing. This defeats the purpose of validation. **Rule:** Strict separation of Prod I/O and Test I/O.
+- **Invariant Validation**: When validating financial pipelines, compare **Quantities** (invariant), not **Market Values** (volatile). Price fluctuations can trigger false positive validation failures.
+- **Manual Escape Hatch**: When parsing fails due to source document limitations (missing data), a manual injection file (CSV) is a pragmatic and necessary workaround to unblock the pipeline.
+
 - **Parallel Development Strategy:** When refactoring critical modules, build new code alongside old (`aggregation_v2/`), test equivalence, then atomic switch. Zero downtime, safe rollback.
 - **Modular Decomposition:** 350-line monolith → 6 focused modules. Each module <100 lines. Single responsibility = easier testing and debugging.
 - **Test Before Delete:** Never delete old code until new code passes ALL existing tests + new unit tests. Integration test comparing old vs new output is critical proof.

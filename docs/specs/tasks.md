@@ -25,6 +25,31 @@
     - **Context/Constraints:** `scripts/test_isin_apis.py` functions collected as tests but not pytest-compatible.
     - **Status:** Completed 2025-11-28. Renamed `test_*` to `_check_*` to avoid pytest collection.
 
+## Phase 1.5: Pipeline Architecture Fix (Critical Data Flow)
+
+> **Plan Reference:** `docs/plans/pipeline_architecture_fix.md`
+
+### Phase 1: Fix Data Flow Architecture
+- [ ] **TASK-P1-001:** Update `state_manager.py` to read from calculated holdings.
+    - **Change:** Point `HOLDINGS_PATH` to `data/working/calculated_holdings.csv`.
+- [ ] **TASK-P1-002:** Update `parse_pdfs_to_csv.py` output path.
+    - **Change:** Output to `data/working/calculated_holdings.csv`.
+- [ ] **TASK-P1-003:** Create unified pipeline entry point (`scripts/run_full_pipeline.py`).
+
+### Phase 2: Fix PDF Parser & Position Logic
+- [ ] **TASK-P2-001:** Verify PDF parser extracts all transactions (dry run).
+- [ ] **TASK-P2-002:** Fix position calculation for sold positions (exclude 0 qty).
+- [ ] **TASK-P2-003:** Handle missing transactions (if parser misses any).
+
+### Phase 3: Fix Ticker Mappings
+- [ ] **TASK-P3-001:** Fix TKMS ticker in `asset_universe.csv`.
+- [ ] **TASK-P3-002:** Investigate/Fix delisted stocks (TAAT, Cresco).
+
+### Phase 4: Documentation & Cleanup
+- [ ] **TASK-P4-001:** Update `SYSTEM_FLOW.md` with correct architecture.
+- [ ] **TASK-P4-002:** Remove misleading `data/true_data/portfolio_holdings.csv`.
+- [ ] **TASK-P4-003:** Update README with correct usage instructions.
+
 ## Phase 2: Technical Debt & Optimization
 
 > **Comprehensive Plan:** See `docs/plans/phase_2_implementation.md` for detailed design.
@@ -112,6 +137,22 @@
     - **Status:** Completed 2025-11-28.
 - **Status:** ✅ Completed
 - **Estimated Time:** 5 mins (actual: 2 mins)
+
+### TASK-015: Fix Pipeline Validation & Data Flow
+- [x] **TASK-015a:** Strict I/O Separation (State Manager)
+    - **File:** `src/data/state_manager.py`
+    - **Action:** Remove `LEGACY_TRUTH_PATH` fallback logic. Ensure pipeline only reads `calculated_holdings.csv`.
+- [x] **TASK-015b:** Update Validation Script Source
+    - **File:** `scripts/validate_pipeline.py`
+    - **Action:** Point `TRUTH_PATH` to `data/true_data/ground_truth_merged.csv`.
+- [x] **TASK-015c:** Refine Validation Logic (Quantity vs Value)
+    - **File:** `scripts/validate_pipeline.py`
+    - **Action:** Make Quantity mismatch a Critical Fail, Value mismatch a Warning.
+- [x] **TASK-015d:** Manual Data Injection (Workaround)
+    - **Context:** PDF lacks quantities for "Direktkauf". Inject missing positions manually.
+    - **Action:** Create `manual_positions.csv` and update `scripts/parse_pdfs_to_csv.py` to merge it.
+- [x] **TASK-015e:** Verify End-to-End
+    - **Action:** Run `scripts/run_full_pipeline.py` and confirm clean execution.
 
 ## Backlog (Future)
 

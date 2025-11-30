@@ -1,12 +1,15 @@
 # 🟢 Active Session State
-**Objective:** Session Complete - Epilogue Executed
-**Status:** Archived
+**Objective:** Handover (TASK-015 Complete)
+**Status:** Done
 
-## 📝 Session Closed
-- TASK-008e completed (test type annotations)
-- Tests: 23/23 passing
-- State archived to `.context/history/2025-11-28_TestTypeAnnotations.md`
+## 🛡️ Applied Constraints
+- **Strict I/O Separation:** Enforced.
+- **Manual Injection:** Implemented and Verified.
 
-## Next Agent Start Here
-- Read `.context/handover.md` for context
-- Check `docs/specs/tasks.md` for backlog (TASK-014: Vanguard Adapter)
+## 📝 Current Focus
+*   **Phase:** Phase 4 (Deliver & Document)
+*   **Ref:** `docs/specs/tasks.md`
+
+## 🧠 Context & Learnings
+*   **Critical:** Trade Republic "Account Statement" PDFs are insufficient for full position calculation (missing quantities).
+*   **Workaround:** `data/inputs/manual_holdings/manual_positions.csv` is now a critical part of the pipeline input.

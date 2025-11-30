@@ -1,6 +1,15 @@
 # Changelog
 
-## [Phase 13] - 2025-11-28
+## [Phase 14] - 2025-11-29
+
+### Fixed
+- **Pipeline Architecture (TASK-015a)**: Fixed critical architectural flaw where the pipeline fell back to "Truth" data when production input was missing. Implemented strict I/O separation in `state_manager.py`—pipeline now fails fast if parsed data is missing.
+- **Validation Logic (TASK-015b/c)**: Fixed `validate_pipeline.py` which was comparing "Look-Through" results against "Direct Holdings" truth (apples-to-oranges). Updated to compare "Direct Holdings" against "Direct Holdings" and prioritized **Share Quantity** (invariant) over Cash Value (volatile).
+- **Data Gap Workaround (TASK-015d)**: Discovered that Trade Republic "Account Statement" PDFs (Kontoauszug) lack share quantities for "Direct Buy" transactions. Implemented a Manual Injection mechanism (`manual_positions.csv`) in `parse_pdfs_to_csv.py` to bridge this data gap.
+
+### Changed
+- **Pipeline Flow**: `run_full_pipeline` now strictly calculates holdings from PDF + Manual Injection, then runs enrichment. No more silent fallback to validation files.
+
 
 ### Changed
 - **Aggregation Module Refactor**: Decomposed monolithic `src/core/aggregation.py` (350+ lines) into a modular package `src/core/aggregation/` with 6 focused modules:

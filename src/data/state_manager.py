@@ -24,8 +24,7 @@ def _to_optional_str(value: Any) -> Optional[str]:
 
 # Paths
 UNIVERSE_PATH = "config/asset_universe.csv"
-HOLDINGS_PATH = "data/true_data/portfolio_holdings.csv"
-LEGACY_TRUTH_PATH = "data/true_data/portfolio_truth.csv"  # Fallback
+HOLDINGS_PATH = "data/working/calculated_holdings.csv"  # Calculated from PDF parser
 
 
 def load_portfolio_state():
@@ -37,31 +36,31 @@ def load_portfolio_state():
         (direct_positions, etf_positions) - Tuple of DataFrames
     """
     # 1. Strategy: Relational Model
-    if os.path.exists(UNIVERSE_PATH) and os.path.exists(HOLDINGS_PATH):
-        logger.info(
-            "Loading portfolio from Relational Database (Universe + Holdings)..."
-        )
-        df_uni = pd.read_csv(UNIVERSE_PATH)
-        df_hold = pd.read_csv(HOLDINGS_PATH)
-
-        # Merge
-        # We merge on ISIN.
-        df = pd.merge(df_hold, df_uni, on="ISIN", how="left")
-
-        # Check for unmapped assets
-        unmapped = df[df["Name"].isna()]
-        if not unmapped.empty:
-            logger.warning(
-                f"{len(unmapped)} assets in Holdings could not be mapped to Universe (Check ISINs)."
+    if os.path.exists(UNIVERSE_PATH):
+        if os.path.exists(HOLDINGS_PATH):
+            logger.info(
+                f"Loading portfolio from Calculated Holdings ({HOLDINGS_PATH})..."
             )
+            df_uni = pd.read_csv(UNIVERSE_PATH)
+            df_hold = pd.read_csv(HOLDINGS_PATH)
 
-    elif os.path.exists(LEGACY_TRUTH_PATH):
-        logger.info(f"Loading portfolio from Legacy Truth: {LEGACY_TRUTH_PATH}")
-        df = pd.read_csv(LEGACY_TRUTH_PATH)
-        if "ISIN" not in df.columns:
-            df["ISIN"] = df["Ticker"]
-        if "Asset_Class" not in df.columns:
-            df["Asset_Class"] = "Stock"
+            # Merge
+            # We merge on ISIN.
+            df = pd.merge(df_hold, df_uni, on="ISIN", how="left")
+
+            # Check for unmapped assets
+            unmapped = df[df["Name"].isna()]
+            if not unmapped.empty:
+                logger.warning(
+                    f"{len(unmapped)} assets in Holdings could not be mapped to Universe (Check ISINs)."
+                )
+        else:
+            logger.warning(f"Calculated holdings file not found: {HOLDINGS_PATH}")
+            logger.warning(
+                "Please run the PDF parser first: python -m scripts.parse_pdfs_to_csv"
+            )
+            return pd.DataFrame(), pd.DataFrame()
+
     else:
         logger.warning("No portfolio state found.")
         return pd.DataFrame(), pd.DataFrame()

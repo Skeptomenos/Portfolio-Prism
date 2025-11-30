@@ -24,7 +24,9 @@ from src.pdf_parser.parser import parse_pdfs_from_folder
 from src.core.position_keeper import calculate_positions
 
 PDF_INPUT_DIR = Path("data/inputs/portfolio")
-CSV_PATH = Path("data/true_data/portfolio_holdings.csv")
+# Changed from data/true_data/portfolio_holdings.csv to working directory
+# This file contains CALCULATED holdings from PDF transactions, not manual truth.
+CSV_PATH = Path("data/working/calculated_holdings.csv")
 
 
 def parse_pdfs_to_positions():
@@ -36,18 +38,49 @@ def parse_pdfs_to_positions():
 
     if trades_df.empty:
         print("⚠ No trades found in PDFs")
-        return pd.DataFrame()
-
-    print(f"   Found {len(trades_df)} trades")
-
-    # Calculate positions
-    positions_df = calculate_positions(trades_df)
+        positions_df = pd.DataFrame()  # Fallback for empty PDF results
+    else:
+        print(f"   Found {len(trades_df)} trades")
+        # Calculate positions
+        positions_df = calculate_positions(trades_df)
 
     # Map to CSV schema (ISIN, Quantity)
-    csv_df = positions_df[["ISIN", "total_quantity"]].copy()
-    csv_df.columns = ["ISIN", "Quantity"]
+    if not positions_df.empty:
+        csv_df = positions_df[["ISIN", "total_quantity"]].copy()
+        csv_df.columns = ["ISIN", "Quantity"]
+    else:
+        csv_df = pd.DataFrame(columns=["ISIN", "Quantity"])
 
     print(f"   Calculated {len(csv_df)} positions from trades")
+
+    # --- MANUAL INJECTION START ---
+    MANUAL_PATH = Path("data/inputs/manual_holdings/manual_positions.csv")
+    if MANUAL_PATH.exists():
+        print(f"🔧 Found Manual Override File: {MANUAL_PATH}")
+        try:
+            manual_df = pd.read_csv(MANUAL_PATH)
+            if "ISIN" in manual_df.columns and "Quantity" in manual_df.columns:
+                print(f"   Injecting {len(manual_df)} manual positions...")
+
+                # Merge logic: Manual overrides PDF if ISIN exists
+                # Combine both, drop duplicates keeping 'last' (assuming manual is appended last)
+                combined = pd.concat([csv_df, manual_df], ignore_index=True)
+
+                # Sum quantities if duplicate ISINs? Or overwrite?
+                # Workaround Plan said "Direct Holdings", implying sum if PDF found partial.
+                # But since PDF found 0 for these, summation is safe.
+                # However, to be safe against double counting if PDF *did* find something,
+                # let's assume manual file contains the TOTAL correct quantity for those ISINs.
+
+                # Strategy: Overwrite positions present in manual file
+                csv_df = combined.drop_duplicates(subset=["ISIN"], keep="last")
+                print(f"   Total positions after injection: {len(csv_df)}")
+            else:
+                print("⚠ Manual file missing 'ISIN' or 'Quantity' columns. Skipping.")
+        except Exception as e:
+            print(f"❌ Error reading manual positions: {e}")
+    # --- MANUAL INJECTION END ---
+
     return csv_df
 
 
