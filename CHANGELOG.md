@@ -1,5 +1,37 @@
 # Changelog
 
+## [Phase 16] - 2025-12-02
+
+### Fixed
+- **Critical: ISIN Resolution Architecture Refactor**: Fixed a systemic issue where ISIN enrichment was polluting the cache and outputs with invalid composite keys (`FALLBACK|ticker|name`). These keys were then sent to external APIs (Finnhub, Wikidata, YFinance), causing 404 errors and pipeline timeouts.
+
+### Added
+- **Unified Resolution Module**: Created `src/data/resolution.py` with priority-ordered ISIN resolution:
+    1. Provider-supplied ISIN (VanEck/Xtrackers provide ISIN in holdings)
+    2. Local `asset_universe.csv` lookup (by ticker)
+    3. Local `asset_universe.csv` lookup (by alias)
+    4. Enrichment cache lookup (validated)
+    5. API calls (Tier 1 only, >1% weight): Finnhub -> Wikidata -> YFinance
+    6. Mark as unresolved
+- **ISIN Validator**: Created `src/utils/isin_validator.py` with Luhn checksum validation and placeholder detection
+- **Resolution Status Tracking**: Holdings now have explicit `resolution_status` (resolved/unresolved/skipped) and `resolution_detail` (source/failure reason) columns
+- **Unresolved Holdings Report**: Pipeline generates `outputs/unresolved_holdings.csv` sorted by value for user action
+- **Cache Validation**: Added `auto_clean_cache()` and input validation to `src/data/caching.py` to prevent future pollution
+- **Resolution Tests**: Created `tests/test_resolution.py` with 24 unit tests for ISIN validation, resolution, and group key generation
+
+### Changed
+- **Group Key Format**: Changed from `FALLBACK|ticker|name` to `UNRESOLVED:{ticker}:{hash10}` (10-digit deterministic hash for 1:10M collision resistance)
+- **ISIN Column Semantics**: The `isin` column now only contains valid ISINs or NULL, never composite keys
+- **Cache Cleanup**: Removed 1,424 polluted cache entries (57.6% of cache) via one-time cleanup script
+
+### Technical Decisions (ADRs)
+- **ADR-001**: ISIN column is sacred - only valid ISINs (12-char, Luhn-valid) or NULL
+- **ADR-002**: Fuzzy matching disabled for Tier 1 (>1%) holdings to prevent false positives
+- **ADR-003**: Auto-add resolved ISINs to asset_universe.csv for future runs
+- **ADR-004**: Hash-based fallback key for deterministic cross-ETF aggregation
+
+---
+
 ## [Phase 15] - 2025-11-30
 
 ### Added

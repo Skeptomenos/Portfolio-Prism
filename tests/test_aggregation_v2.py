@@ -127,12 +127,20 @@ class TestGroupingModule(unittest.TestCase):
         self.assertEqual(result, "US0378331005")
 
     def test_generate_group_id_fallback(self) -> None:
-        """Fallback ID is generated when ISIN is invalid."""
+        """Fallback ID is generated when ISIN is invalid.
+
+        Updated for new UNRESOLVED:{ticker}:{hash} format (ADR-004).
+        """
         row = pd.Series({"isin": "N/A", "ticker": "AAPL", "name": "Apple Inc."})
 
         result = generate_group_id(row)
 
-        self.assertEqual(result, "FALLBACK|AAPL|Apple Inc.")
+        # New format: UNRESOLVED:{ticker}:{10-digit-hash}
+        self.assertTrue(result.startswith("UNRESOLVED:AAPL:"))
+        # Hash is 10 digits
+        hash_part = result.split(":")[-1]
+        self.assertEqual(len(hash_part), 10)
+        self.assertTrue(hash_part.isdigit())
 
     def test_normalize_special_assets_cash(self) -> None:
         """Cash holdings are normalized to CASH_USD."""
@@ -214,49 +222,56 @@ class TestAggregationIntegration(unittest.TestCase):
         are correctly summed.
 
         This is a regression test for the core aggregation logic.
+        Updated to use valid ISINs for the new resolution architecture.
         """
         from src.core.aggregation import run_aggregation
 
-        # Test data
+        # Test data with valid ISINs
+        # US0378331005 = Apple Inc
+        # US5949181045 = Microsoft Corp
+        # US02079K3059 = Alphabet Inc
+        # DE000A0F5UF5 = iShares NASDAQ-100 ETF
+        # IE00B53SZB19 = iShares NASDAQ 100 ETF
+
         direct_positions = pd.DataFrame(
             {
-                "isin": ["AAPL"],
+                "isin": ["US0378331005"],
                 "name": ["Apple Inc."],
                 "market_value": [100.00],
             }
         )
         etf_positions = pd.DataFrame(
             {
-                "isin": ["TechETF1", "TechETF2"],
+                "isin": ["DE000A0F5UF5", "IE00B53SZB19"],
                 "name": ["Tech 1", "Tech 2"],
                 "market_value": [1000.00, 2000.00],
             }
         )
         holdings1 = pd.DataFrame(
             {
-                "isin": ["AAPL", "MSFT"],
+                "isin": ["US0378331005", "US5949181045"],
                 "name": ["Apple", "Microsoft"],
                 "weight_percentage": [10.0, 20.0],
             }
         )
         holdings2 = pd.DataFrame(
             {
-                "isin": ["AAPL", "GOOG"],
+                "isin": ["US0378331005", "US02079K3059"],
                 "name": ["Apple", "Google"],
                 "weight_percentage": [5.0, 15.0],
             }
         )
         etf_holdings_map = {
-            "TechETF1": holdings1,
-            "TechETF2": holdings2,
+            "DE000A0F5UF5": holdings1,
+            "IE00B53SZB19": holdings2,
         }
 
         # Run aggregation
         result_df = run_aggregation(direct_positions, etf_positions, etf_holdings_map)
 
-        # Check AAPL values
-        aapl_row = result_df[result_df["isin"] == "AAPL"]
-        self.assertFalse(aapl_row.empty, "AAPL should exist in output")
+        # Check Apple values (US0378331005)
+        aapl_row = result_df[result_df["isin"] == "US0378331005"]
+        self.assertFalse(aapl_row.empty, "Apple (US0378331005) should exist in output")
 
         # Direct = 100
         self.assertAlmostEqual(

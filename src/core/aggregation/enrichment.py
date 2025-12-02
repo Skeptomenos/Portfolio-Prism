@@ -1,17 +1,45 @@
-"""Tiered ISIN enrichment for ETF holdings."""
+"""
+Tiered ISIN enrichment for ETF holdings.
 
-from typing import Tuple, cast
+This module integrates with the unified resolution system to:
+1. Resolve ISINs for Tier 1 holdings (weight > threshold)
+2. Mark Tier 2 holdings as skipped
+3. Track resolution status for each holding
+"""
+
+from typing import Optional
 
 import pandas as pd
 
 from src.core.health import health
-from src.data.enrichment import enrich_securities
+from src.data.resolution import ISINResolver
+from src.utils.isin_validator import is_valid_isin
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 # Default threshold: only enrich holdings with weight > 1%
 ENRICHMENT_THRESHOLD = 1.0
+
+# Module-level resolver instance (reused across ETFs in a single pipeline run)
+_resolver: Optional[ISINResolver] = None
+
+
+def get_resolver() -> ISINResolver:
+    """Get or create the resolver instance."""
+    global _resolver
+    if _resolver is None:
+        _resolver = ISINResolver(tier1_threshold=ENRICHMENT_THRESHOLD)
+    return _resolver
+
+
+def reset_resolver() -> None:
+    """Reset the resolver (call at end of pipeline to flush to universe)."""
+    global _resolver
+    if _resolver is not None:
+        _resolver.flush_to_universe()
+        logger.info(_resolver.get_stats_summary())
+        _resolver = None
 
 
 def enrich_etf_holdings(
@@ -20,10 +48,10 @@ def enrich_etf_holdings(
     threshold: float = ENRICHMENT_THRESHOLD,
 ) -> pd.DataFrame:
     """
-    Enrich equity holdings with ISIN data using tiered strategy.
+    Enrich equity holdings with ISIN data using tiered resolution.
 
-    Tier 1 (weight > threshold): Full ISIN resolution via API
-    Tier 2 (weight <= threshold): Skip resolution, use fallback aggregation
+    Tier 1 (weight > threshold): Full resolution attempt (local + API)
+    Tier 2 (weight <= threshold): Local-only resolution, else skip
 
     Args:
         holdings: Classified ETF holdings DataFrame (must have 'asset_class' column)
@@ -31,187 +59,99 @@ def enrich_etf_holdings(
         threshold: Weight percentage threshold for Tier 1 (default 1.0)
 
     Returns:
-        Holdings DataFrame with 'isin' column populated
+        Holdings DataFrame with 'isin', 'resolution_status', 'resolution_detail' columns
     """
-    # If ISIN column already exists, nothing to enrich
-    if "isin" in holdings.columns:
-        return holdings
-
     holdings = holdings.copy()
+    resolver = get_resolver()
 
-    logger.info("    - 'isin' column not found. Enriching Equity holdings data...")
+    # Check if already has valid ISIN column
+    if "isin" in holdings.columns:
+        # Validate existing ISINs
+        has_valid = holdings["isin"].apply(
+            lambda x: is_valid_isin(str(x)) if pd.notna(x) else False
+        )
+        if has_valid.all():
+            # All ISINs are valid, just add status columns
+            holdings["resolution_status"] = "resolved"
+            holdings["resolution_detail"] = "provider"
+            return holdings
 
-    # Only enrich equities
+    logger.info("    - 'isin' column not found or incomplete. Running resolution...")
+
+    # Initialize new columns
+    if "isin" not in holdings.columns:
+        holdings["isin"] = None
+    holdings["resolution_status"] = "unresolved"
+    holdings["resolution_detail"] = ""
+
+    # Only process equities
     if "asset_class" not in holdings.columns:
-        logger.warning("    - 'asset_class' column missing. Cannot filter equities.")
-        holdings["isin"] = [f"UNKNOWN_{i}" for i in range(len(holdings))]
+        logger.warning("    - 'asset_class' column missing. Skipping resolution.")
         return holdings
 
+    # Process each holding
     equity_mask = holdings["asset_class"] == "Equity"
-    equity_holdings = holdings[equity_mask].copy()
 
-    # Filter out invalid tickers
-    if "ticker" in equity_holdings.columns:
-        equity_holdings = equity_holdings.dropna(subset=["ticker"]).copy()
-        valid_mask = equity_holdings["ticker"].apply(
-            lambda x: isinstance(x, str) and len(str(x)) > 0
+    tier1_count = 0
+    tier2_count = 0
+    resolved_count = 0
+
+    for idx in holdings.index:
+        row = holdings.loc[idx]
+
+        # Skip non-equities
+        if row.get("asset_class") != "Equity":
+            holdings.at[idx, "resolution_status"] = "skipped"
+            holdings.at[idx, "resolution_detail"] = "non_equity"
+            continue
+
+        ticker = row.get("ticker", "")
+        name = row.get("name", "")
+        provider_isin = row.get("isin") if pd.notna(row.get("isin")) else None
+        weight = float(row.get("weight_percentage", 0) or 0)
+
+        # Skip invalid tickers
+        if not ticker or not isinstance(ticker, str) or len(ticker.strip()) == 0:
+            holdings.at[idx, "resolution_status"] = "skipped"
+            holdings.at[idx, "resolution_detail"] = "invalid_ticker"
+            continue
+
+        # Track tier stats
+        if weight > threshold:
+            tier1_count += 1
+        else:
+            tier2_count += 1
+
+        # Resolve
+        result = resolver.resolve(
+            ticker=str(ticker).strip(),
+            name=str(name).strip() if name else "",
+            provider_isin=str(provider_isin) if provider_isin else None,
+            weight=weight,
         )
-        equity_holdings = equity_holdings[valid_mask].copy()
 
-    if equity_holdings.empty:
-        logger.info("    - No valid equity holdings to enrich.")
-        holdings["isin"] = [f"NON_EQUITY_{i}" for i in range(len(holdings))]
-        return holdings
+        # Update holdings
+        holdings.at[idx, "isin"] = result.isin
+        holdings.at[idx, "resolution_status"] = result.status
+        holdings.at[idx, "resolution_detail"] = result.detail
 
-    # Split into tiers based on weight
-    tier1_holdings, tier2_holdings = _split_by_weight(
-        cast(pd.DataFrame, equity_holdings), etf_market_value, threshold
+        if result.status == "resolved":
+            resolved_count += 1
+
+    # Log summary
+    logger.info(
+        f"    - Resolution: {tier1_count} Tier1 (>{threshold}%), "
+        f"{tier2_count} Tier2 (≤{threshold}%)"
     )
-
-    # Enrich Tier 1 only
-    enriched_df = _enrich_tier1(tier1_holdings)
-
-    # Merge enrichment back into original holdings
-    holdings = _merge_enrichment(holdings, enriched_df, tier2_holdings, threshold)
-
-    return holdings
-
-
-def _split_by_weight(
-    equity_holdings: pd.DataFrame, etf_market_value: float, threshold: float
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Split holdings into Tier 1 (>threshold) and Tier 2 (<=threshold).
-
-    Args:
-        equity_holdings: Equity-only holdings DataFrame
-        etf_market_value: ETF total value for coverage calculation
-        threshold: Weight percentage threshold
-
-    Returns:
-        Tuple of (tier1_holdings, tier2_holdings)
-    """
-    if "weight_percentage" not in equity_holdings.columns:
-        logger.warning(
-            "    ⚠️  'weight_percentage' column missing. Enriching all holdings."
-        )
-        return equity_holdings.copy(), pd.DataFrame()
-
-    # Ensure numeric
-    equity_holdings = equity_holdings.copy()
-    weight_series = pd.to_numeric(equity_holdings["weight_percentage"], errors="coerce")
-    equity_holdings["weight_percentage"] = weight_series.fillna(0.0)
-
-    # Split by threshold
-    tier1_mask = equity_holdings["weight_percentage"] > threshold
-    tier1 = equity_holdings[tier1_mask].copy()
-    tier2 = equity_holdings[~tier1_mask].copy()
+    logger.info(f"    - Resolved: {resolved_count} holdings with valid ISIN")
 
     # Record health metrics
-    health.record_metric("tier1_holdings", len(tier1))
-    health.record_metric("tier2_holdings", len(tier2))
+    health.record_metric("tier1_holdings", tier1_count)
+    health.record_metric("tier2_holdings", tier2_count)
+    health.record_metric("resolved_holdings", resolved_count)
 
-    # Calculate value coverage
-    tier1_weight = tier1["weight_percentage"].sum()
-    tier2_weight = tier2["weight_percentage"].sum()
-    total_weight = tier1_weight + tier2_weight
-
-    if total_weight > 0:
-        tier1_val = (tier1_weight / total_weight) * etf_market_value
-        tier2_val = (tier2_weight / total_weight) * etf_market_value
-        health.record_value_coverage(tier1_val, tier2_val)
-
-    logger.info(
-        f"    - Tiered Enrichment: {len(tier1)} major (>{threshold}%), "
-        f"{len(tier2)} minor (≤{threshold}%)"
-    )
-    logger.info(f"    - Skipping ISIN resolution for {len(tier2)} minor holdings")
-
-    return cast(pd.DataFrame, tier1), cast(pd.DataFrame, tier2)
-
-
-def _enrich_tier1(tier1_holdings: pd.DataFrame) -> pd.DataFrame:
-    """
-    Enrich Tier 1 holdings via ISIN resolution API.
-
-    Args:
-        tier1_holdings: Holdings with weight > threshold
-
-    Returns:
-        DataFrame with [ticker, isin] columns from enrichment
-    """
-    if tier1_holdings.empty:
-        return pd.DataFrame(columns=["ticker", "isin"])
-
-    holdings_list = tier1_holdings.to_dict("records")
-    enriched = enrich_securities(holdings_list)
-
-    if enriched:
-        enriched_df = pd.DataFrame(enriched)
-        health.record_metric("tier1_resolved", len(enriched_df))
-        return enriched_df
-
-    return pd.DataFrame(columns=["ticker", "isin"])
-
-
-def _merge_enrichment(
-    holdings: pd.DataFrame,
-    enriched_df: pd.DataFrame,
-    tier2_holdings: pd.DataFrame,
-    threshold: float,
-) -> pd.DataFrame:
-    """
-    Merge enriched ISINs back into holdings DataFrame.
-
-    Args:
-        holdings: Original holdings DataFrame
-        enriched_df: Enrichment results with [ticker, isin]
-        tier2_holdings: Tier 2 holdings (to mark as N/A)
-        threshold: Weight threshold for failure logging
-
-    Returns:
-        Holdings with 'isin' column populated
-    """
-    holdings = holdings.copy()
-
-    # Check if we can merge
-    if "ticker" not in holdings.columns:
-        logger.error(
-            "    - Cannot merge enriched data: 'ticker' column missing in holdings."
-        )
-        holdings["isin"] = [f"UNKNOWN_{i}" for i in range(len(holdings))]
-        return holdings
-
-    if enriched_df.empty or "ticker" not in enriched_df.columns:
-        logger.warning("    - No enrichment data to merge.")
-        holdings["isin"] = "N/A"
-    else:
-        # Merge on ticker
-        holdings = pd.merge(
-            holdings,
-            enriched_df[["ticker", "isin"]],
-            on="ticker",
-            how="left",
-        )
-        logger.info("    - Enrichment complete. Merged ISINs into holdings.")
-
-    # Mark Tier 2 holdings as N/A (they were intentionally skipped)
-    if not tier2_holdings.empty and "ticker" in tier2_holdings.columns:
-        tier2_tickers = set(tier2_holdings["ticker"].tolist())
-        tier2_mask = holdings["ticker"].isin(tier2_tickers)
-        holdings.loc[tier2_mask, "isin"] = "N/A"
-
-    # Log Tier 1 failures
+    # Log failures for Tier 1
     _log_tier1_failures(holdings, threshold)
-
-    # Fill remaining missing ISINs (non-equities, etc.)
-    if "isin" in holdings.columns:
-        missing_mask = holdings["isin"].isna()
-        holdings.loc[missing_mask, "isin"] = [
-            f"NON_EQUITY_{i}" for i in range(missing_mask.sum())
-        ]
-    else:
-        holdings["isin"] = [f"UNKNOWN_{i}" for i in range(len(holdings))]
 
     return holdings
 
@@ -221,18 +161,17 @@ def _log_tier1_failures(holdings: pd.DataFrame, threshold: float) -> None:
     Log and record health metrics for Tier 1 ISIN resolution failures.
 
     Args:
-        holdings: Holdings after enrichment merge
+        holdings: Holdings after resolution
         threshold: Weight threshold used for Tier 1
     """
-    # Need both columns to identify failures
-    required_cols = ["weight_percentage", "asset_class", "isin"]
+    required_cols = ["weight_percentage", "asset_class", "resolution_status"]
     if not all(col in holdings.columns for col in required_cols):
         return
 
     # Find Tier 1 holdings that failed to resolve
     tier1_failed = holdings[
         (holdings["asset_class"] == "Equity")
-        & (holdings["isin"].isin(["N/A", None, ""]) | holdings["isin"].isna())
+        & (holdings["resolution_status"] == "unresolved")
         & (holdings["weight_percentage"] > threshold)
     ]
 
@@ -251,11 +190,12 @@ def _log_tier1_failures(holdings: pd.DataFrame, threshold: float) -> None:
             break
 
         ticker = row.get("ticker", "unknown")
-        logger.warning(f"        - {ticker}")
+        detail = row.get("resolution_detail", "unknown")
+        logger.warning(f"        - {ticker} ({detail})")
         health.record_failure(
             stage="ENRICHMENT",
             item=str(ticker),
-            error="Tier 1 ISIN Resolution Failed",
+            error=f"Tier 1 ISIN Resolution Failed: {detail}",
             fix=f"Add {ticker} to config/asset_universe.csv",
             severity="MEDIUM",
         )

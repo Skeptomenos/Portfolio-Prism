@@ -63,16 +63,20 @@ flowchart TB
         ETFHoldings["ETF Holdings<br/>(Ticker, Weight%)"]
     end
 
-    subgraph Enrich["🧬 ENRICHMENT"]
+    subgraph Enrich["🧬 ISIN RESOLUTION"]
         Classification["Asset Classification<br/>(Equity/Cash/Derivative)"]
         TierSplit["Tiered Split<br/>(>1% vs ≤1%)"]
-        subgraph APIs["Resolution APIs"]
-            Local["Local Universe"]
-            Finnhub["Finnhub API"]
-            Wikidata["Wikidata"]
-            YF2["YFinance Metadata"]
+        subgraph Resolution["Resolution Priority"]
+            Provider["1. Provider ISIN"]
+            Local["2. Universe Lookup"]
+            Cache["3. Cache Lookup"]
+            subgraph APIs["4. APIs (Tier 1 only)"]
+                Finnhub["Finnhub"]
+                Wikidata["Wikidata"]
+                YF2["YFinance"]
+            end
         end
-        Cache["Enrichment Cache"]
+        Unresolved["Unresolved Report"]
     end
 
     subgraph Aggregate["📊 AGGREGATION"]
@@ -117,9 +121,9 @@ flowchart TB
     iShares & VanEck & Xtrackers & Amundi --> ETFHoldings
 
     ETFHoldings --> Classification --> TierSplit
-    TierSplit --> Local
-    Local --> Finnhub --> Wikidata --> YF2
-    Local & Finnhub & Wikidata & YF2 --> Cache
+    TierSplit --> Provider --> Local --> Cache
+    Cache --> Finnhub --> Wikidata --> YF2
+    YF2 --> Unresolved
 
     Direct --> DirectVal
     ETFHoldings --> IndirectVal
@@ -140,7 +144,7 @@ flowchart TB
 | **3. State Loading** | Join universe + holdings, split into Stocks vs ETFs | `src/data/state_manager.py` |
 | **4. Market Data** | Fetch live prices from Yahoo Finance, normalize to EUR | `src/data/market.py` |
 | **5. ETF Decomposition** | Fetch underlying holdings via provider-specific adapters | `src/adapters/*.py` |
-| **6. Enrichment** | Resolve ISINs via Local → Finnhub → Wikidata → YFinance | `src/data/enrichment.py` |
+| **6. Resolution** | Resolve ISINs via Provider → Universe → Cache → APIs (Tier 1 only) | `src/data/resolution.py` |
 | **7. Aggregation** | Sum direct + indirect exposure per security | `src/core/aggregation.py` |
 | **8. Reporting** | Generate sector, geography, and top holdings reports | `src/core/reporting.py` |
 | **9. Validation** | Value conservation check (±2% tolerance) | `src/core/validation.py` |
@@ -156,9 +160,9 @@ flowchart TB
 **Challenge:** Amundi's website uses complex anti-bot protections and JavaScript-blob downloads that defeated standard Selenium automation.
 **Solution:** Instead of fighting the website, we built a "Manual Escape Hatch". The system detects if it can't download an Amundi file and pauses to ask the user to drop the file into `data/inputs/manual_holdings/`. This prioritizes system stability over 100% automation.
 
-#### 3. Tiered Enrichment
+#### 3. Tiered Resolution
 **Challenge:** Enriching 1,500+ holdings per ETF would exhaust API rate limits.
-**Solution:** We implement **Tiered Enrichment**: Only holdings >1% weight get full ISIN resolution (Tier 1). Minor holdings (≤1%) use fallback aggregation by Ticker+Name (Tier 2). This reduces API calls by 90%+ while preserving 95%+ of portfolio value accuracy.
+**Solution:** We implement **Tiered Resolution**: Only holdings >1% weight get full ISIN resolution via APIs (Tier 1). Minor holdings (≤1%) use deterministic `UNRESOLVED:{ticker}:{hash}` keys for aggregation (Tier 2). The ISIN column remains sacred—only valid ISINs or NULL, never composite keys. This reduces API calls by 90%+ while preserving 95%+ of portfolio value accuracy.
 
 #### 4. Value Conservation Check
 **Challenge:** When you break apart an ETF, you risk losing value in the math (e.g., tracking errors, cash drag, unclassified assets).
@@ -252,9 +256,9 @@ scripts/                    # Entry points (run_pipeline.py, manage_assets.py)
 src/
 ├── adapters/               # ETF Provider logic (iShares, VanEck, etc.)
 ├── core/                   # Aggregation, Reporting, Validation
-├── data/                   # I/O, Enrichment, Market Data, Caching
+├── data/                   # I/O, Resolution, Market Data, Caching
 ├── pdf_parser/             # Trade Republic PDF parser
-└── utils/                  # Logging, Schemas, Classification
+└── utils/                  # Logging, ISIN Validation, Classification
 outputs/                    # Your final reports
 docs/
 ├── specs/                  # Living specifications (product, tech, requirements)
@@ -279,7 +283,8 @@ ruff format .
 | Pattern | Description |
 |---------|-------------|
 | **Hybrid First** | Automation with manual fallback for brittle sources |
-| **Tiered Enrichment** | Prioritize high-value holdings (>1%) to minimize API calls |
+| **Tiered Resolution** | Prioritize high-value holdings (>1%) for API calls; minor holdings use `UNRESOLVED:` keys |
+| **Sacred ISIN Column** | ISIN column only contains valid ISINs (Luhn-checked) or NULL, never composite keys |
 | **Self-Learning Cache** | Auto-harvest successful resolutions to `asset_universe.csv` |
 | **Value Conservation** | Audit trail with ±2% tolerance check |
 | **Logic/IO Separation** | Pure aggregation logic in `core/`, I/O in `adapters/` and `data/` |

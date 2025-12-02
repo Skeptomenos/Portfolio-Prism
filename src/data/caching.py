@@ -6,6 +6,7 @@ from functools import wraps
 from datetime import datetime, timedelta
 from src.utils.logging_config import get_logger
 from src.utils.metrics import tracker
+from src.utils.isin_validator import is_valid_isin, is_placeholder_isin
 
 logger = get_logger(__name__)
 
@@ -18,6 +19,73 @@ ENRICHMENT_CACHE_FILE = "data/working/cache/enrichment_cache.json"
 def get_cache_key(identifier: str) -> str:
     """Generates a standardized cache key."""
     return str(identifier).upper().strip()
+
+
+def is_valid_cache_key(key: str) -> bool:
+    """
+    Validate that a cache key is acceptable.
+
+    Rejects:
+    - Keys containing pipe characters (old composite keys)
+    - Keys starting with FALLBACK/UNRESOLVED patterns
+    - Keys that are placeholder values
+    """
+    if not key or not isinstance(key, str):
+        return False
+
+    key_upper = key.upper().strip()
+
+    # Reject composite/placeholder patterns
+    if is_placeholder_isin(key_upper):
+        return False
+
+    return True
+
+
+def auto_clean_cache() -> dict:
+    """
+    Remove invalid entries from the enrichment cache.
+
+    Returns:
+        dict with cleanup statistics
+    """
+    cache = _load_json_cache()
+    if not cache:
+        return {"total": 0, "removed": 0, "retained": 0}
+
+    original_count = len(cache)
+    cleaned_cache = {}
+    removed_keys = []
+
+    for key, value in cache.items():
+        # Check key validity
+        if not is_valid_cache_key(key):
+            removed_keys.append(key)
+            continue
+
+        # Check if value has valid ISIN (if it claims to have one)
+        isin = value.get("isin") if isinstance(value, dict) else None
+        if isin and not is_valid_isin(isin):
+            removed_keys.append(key)
+            continue
+
+        cleaned_cache[key] = value
+
+    # Save cleaned cache if any removals occurred
+    removed_count = len(removed_keys)
+    if removed_count > 0:
+        _save_json_cache(cleaned_cache)
+        logger.info(
+            f"Cache auto-cleanup: removed {removed_count} invalid entries, "
+            f"retained {len(cleaned_cache)}"
+        )
+
+    return {
+        "total": original_count,
+        "removed": removed_count,
+        "retained": len(cleaned_cache),
+        "removed_keys": removed_keys[:10],  # Sample for logging
+    }
 
 
 def _load_json_cache():
@@ -47,11 +115,32 @@ def load_from_cache(key: str):
     return cache.get(key)
 
 
-def save_to_cache(key: str, data: dict):
-    """Saves a key-value pair to the JSON cache."""
+def save_to_cache(key: str, data: dict) -> bool:
+    """
+    Saves a key-value pair to the JSON cache.
+
+    Validates:
+    - Key is not a composite/placeholder pattern
+    - ISIN value (if present) is valid
+
+    Returns:
+        True if saved successfully, False if rejected
+    """
+    # Validate key
+    if not is_valid_cache_key(key):
+        logger.warning(f"Rejected invalid cache key: {key}")
+        return False
+
+    # Validate ISIN in data if present
+    isin = data.get("isin") if isinstance(data, dict) else None
+    if isin and not is_valid_isin(isin):
+        logger.warning(f"Rejected invalid ISIN in cache data: {isin} for key {key}")
+        return False
+
     cache = _load_json_cache()
     cache[key] = data
     _save_json_cache(cache)
+    return True
 
 
 def cache_adapter_data(ttl_hours: int = 24):

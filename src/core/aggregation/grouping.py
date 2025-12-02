@@ -5,6 +5,7 @@ from typing import Literal
 import pandas as pd
 
 from src.models import AggregatedExposure
+from src.utils.isin_validator import is_valid_isin, generate_group_key
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -45,29 +46,25 @@ def generate_group_id(row: pd.Series) -> str:
     """
     Generate unique group ID for aggregation.
 
-    Uses ISIN if valid, otherwise falls back to Ticker+Name.
+    Uses ISIN if valid, otherwise generates a deterministic hash-based
+    key for unresolved holdings.
 
     Args:
         row: DataFrame row with isin, ticker, name columns
 
     Returns:
-        Group ID string
+        Group ID string (ISIN or UNRESOLVED:{ticker}:{hash10})
     """
-    isin = row.get("isin", "N/A")
+    isin = row.get("isin")
 
-    # Check for valid ISIN
-    if (
-        isin
-        and str(isin) not in ("N/A", "nan", "None", "")
-        and not str(isin).startswith("UNKNOWN")
-        and not str(isin).startswith("NON_EQUITY")
-    ):
+    # Check for valid ISIN using proper validation
+    if isin and is_valid_isin(str(isin)):
         return str(isin)
 
-    # Fallback: Ticker + Name
-    ticker = str(row.get("ticker", ""))
-    name = str(row.get("name", ""))
-    return f"FALLBACK|{ticker}|{name}"
+    # Deterministic fallback with 10-digit hash (1 in 10 million collision)
+    ticker = str(row.get("ticker", "")).strip()
+    name = str(row.get("name", "")).strip()
+    return generate_group_key(ticker, name)
 
 
 def normalize_special_assets(holdings: pd.DataFrame) -> pd.DataFrame:
@@ -117,17 +114,19 @@ def aggregate_indirect_holdings(
     all_holdings = all_holdings.copy()
     all_holdings["group_id"] = all_holdings.apply(generate_group_id, axis=1)
 
+    # Also preserve resolution_status if present
+    agg_dict = {
+        "indirect": ("indirect", "sum"),
+        "name": ("name", "first"),
+        "isin": ("isin", "first"),
+        "asset_class": ("asset_class", "first"),
+    }
+
+    if "resolution_status" in all_holdings.columns:
+        agg_dict["resolution_status"] = ("resolution_status", "first")
+
     # Aggregate by group
-    aggregated = (
-        all_holdings.groupby("group_id")
-        .agg(
-            indirect=("indirect", "sum"),
-            name=("name", "first"),
-            isin=("isin", "first"),
-            asset_class=("asset_class", "first"),
-        )
-        .reset_index()
-    )
+    aggregated = all_holdings.groupby("group_id").agg(**agg_dict).reset_index()
 
     # Add to exposures
     for _, row in aggregated.iterrows():

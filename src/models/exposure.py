@@ -18,7 +18,7 @@ class ExposureRecord(BaseModel):
     aggregating all sources of exposure to a single security.
 
     Attributes:
-        isin: Security identifier (ISIN or fallback key)
+        isin: Security identifier (ISIN or group_key for unresolved)
         name: Security name
         direct: EUR value from direct holdings
         indirect: EUR value from ETF decomposition
@@ -27,13 +27,26 @@ class ExposureRecord(BaseModel):
         geography: Country of domicile
     """
 
-    isin: str
+    isin: str  # This is actually group_key (ISIN or UNRESOLVED:...)
     name: str
     direct: float = Field(default=0.0, ge=0)
     indirect: float = Field(default=0.0, ge=0)
     asset_class: Literal["Equity", "Cash", "Derivative"] = "Equity"
     sector: Optional[str] = None
     geography: Optional[str] = None
+
+    @computed_field
+    @property
+    def resolution_status(self) -> Literal["resolved", "unresolved"]:
+        """
+        Determine resolution status from the ISIN/group_key.
+
+        Returns:
+            'resolved' if valid ISIN, 'unresolved' if UNRESOLVED:... pattern
+        """
+        if self.isin and self.isin.startswith("UNRESOLVED:"):
+            return "unresolved"
+        return "resolved"
 
     @computed_field
     @property
@@ -69,6 +82,7 @@ class ExposureRecord(BaseModel):
             "indirect": self.indirect,
             "total_exposure": self.total_exposure,
             "asset_class": self.asset_class,
+            "resolution_status": self.resolution_status,
             "sector": self.sector,
             "geography": self.geography,
         }
@@ -84,10 +98,12 @@ class AggregatedExposure(BaseModel):
     Attributes:
         records: List of individual exposure records
         total_portfolio_value: Sum of all exposures in EUR
+        true_total_value: True top-down portfolio value (optional, overrides sum for %)
     """
 
     records: list[ExposureRecord] = Field(default_factory=list)
     total_portfolio_value: float = Field(default=0.0, ge=0)
+    true_total_value: Optional[float] = None
 
     def add_record(self, record: ExposureRecord) -> None:
         """
@@ -164,6 +180,7 @@ class AggregatedExposure(BaseModel):
                     "total_exposure",
                     "portfolio_percentage",
                     "asset_class",
+                    "resolution_status",
                     "sector",
                     "geography",
                 ]
@@ -173,7 +190,13 @@ class AggregatedExposure(BaseModel):
         df = pd.DataFrame(data)
 
         # Calculate portfolio percentage
-        total = self.total_portfolio_value or self.calculate_total()
+        # Use true_total_value if set, otherwise fallback to sum of exposures
+        total = (
+            self.true_total_value
+            if self.true_total_value is not None
+            else (self.total_portfolio_value or self.calculate_total())
+        )
+
         if total > 0:
             df["portfolio_percentage"] = (df["total_exposure"] / total) * 100
         else:

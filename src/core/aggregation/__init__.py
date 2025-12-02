@@ -18,7 +18,7 @@ from src.utils.logging_config import get_logger
 
 from .classification import classify_etf_holdings
 from .direct import process_direct_holdings
-from .enrichment import enrich_etf_holdings
+from .enrichment import enrich_etf_holdings, reset_resolver
 from .grouping import aggregate_indirect_holdings, calculate_indirect_values
 from .output import finalize_and_save
 
@@ -57,6 +57,19 @@ def run_aggregation(
 
     # Initialize aggregator
     exposures = AggregatedExposure()
+
+    # Calculate True Portfolio Value (Top-Down) for correct percentage calculations
+    # This prevents "leakage" from decomposition affecting portfolio-wide stats
+    direct_val = (
+        direct_positions["market_value"].sum() if not direct_positions.empty else 0.0
+    )
+    etf_val = etf_positions["market_value"].sum() if not etf_positions.empty else 0.0
+    true_total = direct_val + etf_val
+
+    exposures.true_total_value = true_total
+    logger.info(
+        f"Aggregation initialized with True Portfolio Value: €{true_total:,.2f}"
+    )
 
     # Step 1: Process direct holdings
     process_direct_holdings(direct_positions, exposures)
@@ -155,7 +168,10 @@ def run_aggregation(
     # Step 3: Aggregate all indirect holdings
     aggregate_indirect_holdings(all_holdings, exposures)
 
-    # Step 4: Finalize and save
+    # Step 4: Flush resolver (writes newly resolved ISINs to universe)
+    reset_resolver()
+
+    # Step 5: Finalize and save
     return finalize_and_save(exposures, output_filepath)
 
 

@@ -17,35 +17,48 @@ class TestAggregation(unittest.TestCase):
         Tests the specific scenario where a security is held directly and also
         appears in multiple ETFs, verifying the aggregation logic correctly sums
         all sources of exposure. This is the regression test for Feedback #1.
+
+        Updated to use valid ISINs for the new resolution architecture.
         """
-        # 1. Define Input DataFrames
+        # 1. Define Input DataFrames with valid ISINs
+        # US0378331005 = Apple Inc (valid ISIN)
+        # US5949181045 = Microsoft Corp (valid ISIN)
+        # US02079K3059 = Alphabet Inc (valid ISIN)
+        # DE000A0F5UF5 = iShares NASDAQ-100 ETF (valid ETF ISIN)
+        # IE00B53SZB19 = iShares NASDAQ 100 ETF (valid ETF ISIN)
+
         direct_positions = pd.DataFrame(
-            {"isin": ["AAPL"], "name": ["Apple Inc."], "market_value": [100.00]}
+            {
+                "isin": ["US0378331005"],
+                "name": ["Apple Inc."],
+                "market_value": [100.00],
+            }
         )
         etf_positions = pd.DataFrame(
             {
-                "isin": ["TechETF1", "TechETF2"],
+                "isin": ["DE000A0F5UF5", "IE00B53SZB19"],
                 "name": ["Tech 1", "Tech 2"],
                 "market_value": [1000.00, 2000.00],
             }
         )
 
+        # ETF holdings with valid ISINs
         holdings1 = pd.DataFrame(
             {
-                "isin": ["AAPL", "MSFT"],
+                "isin": ["US0378331005", "US5949181045"],
                 "name": ["Apple", "Microsoft"],
                 "weight_percentage": [10.0, 20.0],
             }
         )
         holdings2 = pd.DataFrame(
             {
-                "isin": ["AAPL", "GOOG"],
+                "isin": ["US0378331005", "US02079K3059"],
                 "name": ["Apple", "Google"],
                 "weight_percentage": [5.0, 15.0],
             }
         )
 
-        etf_holdings_map = {"TechETF1": holdings1, "TechETF2": holdings2}
+        etf_holdings_map = {"DE000A0F5UF5": holdings1, "IE00B53SZB19": holdings2}
 
         # 2. Run the aggregation logic
         output_file = str(TRUE_EXPOSURE_REPORT)
@@ -58,7 +71,7 @@ class TestAggregation(unittest.TestCase):
         actual_df = pd.read_csv(output_file)
 
         # 3. Define Expected Outcome and Assert
-        aapl_row = actual_df[actual_df["isin"] == "AAPL"]
+        aapl_row = actual_df[actual_df["isin"] == "US0378331005"]
         self.assertFalse(aapl_row.empty)
 
         self.assertAlmostEqual(float(aapl_row["direct"].iloc[0]), 100.0, places=2)

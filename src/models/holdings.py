@@ -8,6 +8,8 @@ through classification and enrichment stages.
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 from typing import Optional, Literal
 
+from src.utils.isin_validator import is_valid_isin, generate_group_key
+
 
 class ETFHolding(BaseModel):
     """
@@ -61,40 +63,34 @@ class EnrichedHolding(ClassifiedHolding):
     Attributes:
         sector: Industry sector (e.g., "Technology")
         geography: Country of domicile (e.g., "United States")
-        enrichment_tier: Whether resolved via Tier 1 (>1%) or Tier 2 (fallback)
+        resolution_status: Whether ISIN was resolved, unresolved, or skipped
+        resolution_detail: Source of resolution or failure reason
         indirect_value: Calculated EUR value (weight% * ETF market value)
     """
 
     sector: str = "Unknown"
     geography: str = "Unknown"
-    enrichment_tier: Literal["tier1", "tier2"] = "tier1"
+    resolution_status: Literal["resolved", "unresolved", "skipped"] = "unresolved"
+    resolution_detail: Optional[str] = None
     indirect_value: float = Field(default=0.0, ge=0.0)
 
     @computed_field
     @property
-    def group_id(self) -> str:
+    def group_key(self) -> str:
         """
         Generate unique grouping key for aggregation.
 
-        Uses ISIN if available and valid, otherwise falls back
-        to a composite key of ticker + name.
+        Uses ISIN if valid, otherwise generates a deterministic
+        hash-based key for unresolved holdings.
 
         Returns:
-            Unique identifier for grouping this holding
+            ISIN if resolved, else UNRESOLVED:{ticker}:{hash10}
         """
-        isin = self.isin
-        if (
-            isin
-            and isin not in ("N/A", "nan", None, "")
-            and not isin.startswith("UNKNOWN")
-            and not isin.startswith("NON_EQUITY")
-        ):
-            return isin
+        if self.isin and is_valid_isin(self.isin):
+            return self.isin
 
-        # Fallback: Ticker + Name
-        ticker = self.ticker or ""
-        name = self.name or ""
-        return f"FALLBACK|{ticker}|{name}"
+        # Deterministic fallback with 10-digit hash
+        return generate_group_key(self.ticker or "", self.name or "")
 
     def calculate_indirect_value(self, etf_market_value: float) -> None:
         """
