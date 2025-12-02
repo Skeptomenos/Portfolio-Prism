@@ -261,8 +261,8 @@ src/
 └── utils/                  # Logging, ISIN Validation, Classification
 outputs/                    # Your final reports
 docs/
-├── specs/                  # Living specifications (product, tech, requirements)
-└── agent/                  # AI agent directives and standards
+└── specs/                  # Living specifications (product, tech, requirements)
+coding/                     # AI engineering framework (Anamnesis)
 ```
 
 ## 🧪 Development
@@ -288,3 +288,7 @@ ruff format .
 | **Self-Learning Cache** | Auto-harvest successful resolutions to `asset_universe.csv` |
 | **Value Conservation** | Audit trail with ±2% tolerance check |
 | **Logic/IO Separation** | Pure aggregation logic in `core/`, I/O in `adapters/` and `data/` |
+
+## 🤖 Built with AI
+
+This project was developed using [Anamnesis](https://github.com/Skeptomenos/Anamnesis), an AI engineering framework that provides structured directives, thinking protocols, and coding standards for AI-assisted development. The framework's spec-driven workflow and state management patterns are implemented in the `coding/` directory.
