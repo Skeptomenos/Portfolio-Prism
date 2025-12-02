@@ -1,5 +1,9 @@
 # Coding Standards & Best Practices
 
+> **PROGRESSIVE DISCLOSURE:**
+> This file is referenced by the root file (`AGENTS.md`) for code quality rules.
+> Read this when writing or reviewing code.
+
 > **Application:** These standards apply to **all** code written in this project.
 > **Enforcement:** Code that violates these rules should be rejected during the Phase 3 (Verify) gate.
 
@@ -135,3 +139,34 @@
 **8.3 Pragmatic Spec Rule**
 *   **Zero Waste:** Do not create empty spec files. If a spec (like `design.md`) is not needed for the specific task, do not create it.
 *   **Inline Context:** When writing code, if a constraint is critical (e.g., "No Redux"), add it as a comment in the file header.
+
+---
+
+### 9. Operational Mandates (Reliability)
+
+These are existential rules for agent reliability. Violations cause systemic failures.
+
+**9.1 The "Hybrid First" Rule**
+*   **Context:** Automation tasks can be brittle with hostile data sources.
+*   **Rule:** If automation takes >1 hour to debug, **STOP**. Implement a "Manual Escape Hatch" (file drop, manual input) instead.
+*   **Priority:** Getting the data > automating the process.
+
+**9.2 The "I/O Fortress" Rule**
+*   **Context:** External APIs and network calls are flaky and rate-limited.
+*   **Rule:** All external I/O MUST be:
+    1.  **Cached** (with TTL)
+    2.  **Throttled** (client-side delays)
+    3.  **Validated** (contract tests at boundary)
+*   **Mandate:** Never trust external input. Fail fast at the boundary.
+
+**9.3 The "Clean Slate" Rule**
+*   **Context:** "Ghost" assets appear when stale state mixes with new data.
+*   **Rule:** Pipelines MUST be destructive. Wipe cache/database before full runs, or use strict upsert logic.
+*   **Mandate:** Assume the database is dirty. State-based snapshots > event-based replays.
+
+**9.4 The "Preservation of Knowledge" Rule**
+*   **Context:** AI agents often truncate or overwrite documentation, losing history.
+*   **Rule:** When updating documentation (README, specs, learnings):
+    *   **APPEND** or **REFINE**—never delete without permission
+    *   **NEVER** rewrite a file from scratch if only one section changed
+    *   If content is obsolete, mark it `> **Deprecated:** ...` rather than deleting

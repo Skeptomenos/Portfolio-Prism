@@ -5,6 +5,12 @@ from dotenv import load_dotenv, find_dotenv
 # Load environment variables from .env file
 load_dotenv(find_dotenv())
 
+import sys
+import os
+
+# Add project root to sys.path to ensure scripts package is resolvable
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 from src.data.state_manager import load_portfolio_state
 from src.core.aggregation import run_aggregation
@@ -249,8 +255,16 @@ def run_pipeline():
     health.save_artifacts()
     print("\n" + health.generate_report())
 
-    # For now, keeping generate_report() as is, but adding the harvest_cache after it.
-    generate_report()
+    # Calculate True Portfolio Value for Reporting
+    portfolio_total_value = (
+        all_positions["market_value"].sum() if not all_positions.empty else 0.0
+    )
+    logger.info(
+        f"--- Calculated True Portfolio Value: €{portfolio_total_value:,.2f} ---"
+    )
+
+    # Generate Reports with Correct Percentage Base
+    generate_report(total_portfolio_value=portfolio_total_value)
 
     # --- Phase 6: Visualization ---
     from scripts.visualize_portfolio import run_visualization

@@ -1,78 +1,73 @@
-# AI Agent Instructions (Generic)
+# Portfolio True Exposure POC
 
-This document provides the "Bootloader" instructions for any AI agent (Claude, ChatGPT, etc.) operating in this repository.
+> **Root File:** Auto-loaded by AI CLI tools. Keep concise (<80 lines).
 
-> **CRITICAL AUTHORITY:**
-> The "Code of Law" for this project is located in **`docs/agent/AI_CODING_DIRECTIVES.md`**.
-> You **MUST** read that file immediately after initialization. It defines your Directives, Directives for Coding, and Operational Mandates.
-> **Violating those directives is a system failure.**
+## Overview
 
-## 1. Initialization Protocol (Phase 0)
+A Python-based ETL pipeline and Streamlit dashboard that parses PDF brokerage statements (Trade Republic, Amundi), aggregates holdings, and exposes true underlying assets (Look-Through) via a unified interface.
 
-You are "booting up" into an ongoing development process. Do not act until you are oriented.
+## Tech Stack
 
-1.  **Environment Scan:**
-    *   `ls -F` (See immediate context)
-    *   `git status` (Check for dirty state)
-    *   `ls -F docs/specs/` (Check for existing Specifications)
+- **Language:** Python 3.9+
+- **Framework:** Streamlit, Pandas, Pydantic
+- **Tools:** Selenium (Scraping), Ruff (Linting), Pytest
 
-2.  **Load Directives:**
-    *   **READ** `docs/agent/AI_CODING_DIRECTIVES.md` (The Constitution)
-    *   **READ** `docs/agent/CODING_STANDARDS.md` (The Style Guide)
+## Structure
 
-3.  **Load State:**
-    *   **READ** `.context/active_state.md`.
-    *   **READ** `.context/handover.md`.
-    *   **READ** `docs/PROJECT_LEARNINGS.md`.
+```
+src/           # Source code (Logic/IO separated)
+scripts/       # Execution scripts (Pipeline, Tools)
+tests/         # Unit and Integration tests
+docs/specs/    # Specifications (Source of Truth)
+.context/      # AI session state
+coding/        # AI framework (Directives)
+```
 
-4.  **State Decision:**
-    *   *Continuing?* **RESUME** work. Update "Current Focus" in `active_state.md`.
-    *   *New Task?* **ARCHIVE** old state (see Finalization) and **RESET** `active_state.md`.
+---
 
-## 2. Execution Lifecycle (The Loop)
+## Protocol
 
-Follow the phases defined in `AI_CODING_DIRECTIVES.md`:
+### Golden Rules
 
-*   **Phase 1: Spec & Architect** -> Update `docs/specs/` (product, tech, requirements).
-*   **Phase 2: Build & Implement** -> Code -> `tasks.md` update.
-*   **Phase 3: Verify & Secure** -> Tests -> Contract Checks.
-*   **Phase 4: Deliver & Document** -> Docs -> Changelog.
+1. **State:** Read `.context/active_state.md` at start, update at end
+2. **Specs:** Complex tasks (>1hr) require `docs/specs/`. No code without spec.
+3. **Consensus:** Present plan, WAIT for approval before coding
+4. **Epilogue:** MANDATORY after feature/design completion. Includes reflective thinking (T-RFL), not just documentation.
 
-**Task Tracking:**
-*   **Source of Truth:** `docs/specs/tasks.md` is your project manager.
-*   **Scratchpad:** Use internal tool lists only for ephemeral sub-steps.
+> **ESCAPE HATCH:** Simple questions or read-only tasks → skip protocol, act immediately.
 
-## 3. Finalization Protocol (The Epilogue)
+### When to Read
 
-You are **NOT DONE** until you preserve your brain state for the next agent.
+| Task | File |
+|------|------|
+| New feature, refactor | `coding/THINKING_DIRECTIVES.md` |
+| Complex bug | `coding/THINKING_DIRECTIVES.md` (T1-RCA) |
+| Implementation | `coding/EXECUTION_DIRECTIVES.md` |
+| Code review | `coding/CODING_STANDARDS.md` |
+| Project constraints | `PROJECT_LEARNINGS.md` |
 
-1.  **Documentation Sync:**
-    *   Update `CHANGELOG.md`.
-    *   Update `docs/specs/` if reality diverged from the plan.
+---
 
-2.  **Recursive Learning:**
-    *   Update `docs/PROJECT_LEARNINGS.md` with **one** new pattern/anti-pattern found.
+## Commands
 
-3.  **Archival Rotation (CRITICAL):**
-    *   **MOVE** `.context/active_state.md` TO `.context/history/YYYY-MM-DD_TaskName.md`.
-    *   **CREATE** a fresh `.context/active_state.md` (or leave it for the next agent to initialize).
-    *   **UPDATE** `.context/handover.md` with a clean summary for the next agent.
+```bash
+# Build/Run Pipeline: python scripts/run_full_pipeline.py
+# Run Dashboard:      ./run_dashboard.sh
+# Test:               pytest
+# Lint:               ruff check .
+```
 
-## Project Structure (Map)
+## Constraints
 
-*   `src/`: Source code (logic/io separated).
-*   `config/`: JSON/CSV config (no hardcoding).
-*   `data/`:
-    *   `inputs/`: Read-only external data (PDFs).
-    *   `working/`: Scratchpad (DBs, Cache).
-*   `docs/`:
-    *   `specs/`: **Living Specifications** (product, tech, requirements, tasks).
-    *   `agent/`: Meta-instructions (Directives, Standards).
-*   `.context/`:
-    *   `active_state.md`: The current brain.
-    *   `history/`: Archived brains.
+- **Logic/IO Separation:** Pure logic must be testable without side effects.
+- **Project Structure:** Use `src/` layout; no `sys.path` hacks.
+- **See:** `PROJECT_LEARNINGS.md` for full list of constraints.
 
 ## Custom Agents
 
-*   **@docs-validation:** Use for heavy documentation review.
-*   **@parser-generator:** Use for complex regex generation (PDF parsing).
+- **@docs-validation:** Use for heavy documentation review.
+- **@parser-generator:** Use for complex regex generation (PDF parsing).
+
+## State Files
+
+`.context/active_state.md` (current) | `.context/handover.md` (previous) | `docs/specs/tasks.md` (plan)
