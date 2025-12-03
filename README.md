@@ -6,6 +6,14 @@ You own ETFs. But what do you *actually* own? This tool breaks apart your ETF wr
 
 ---
 
+## 🚧 Currently in Development
+
+**Trade Republic API Integration** - We're integrating [pytr](https://github.com/pytr-org/pytr), an unofficial Trade Republic API client, to replace manual PDF exports. This will allow automatic portfolio fetching directly from your Trade Republic account.
+
+Status: ✅ POC validated - pytr successfully fetches portfolio data and integrates with the pipeline.
+
+---
+
 ## 🚀 5-Minute Quickstart
 
 ### 1. Prerequisites
@@ -66,6 +74,27 @@ The pipeline will:
 6. **Generate reports** - Save results to `outputs/`
 
 > **Incremental mode:** The parser runs in `--mode add_new` by default, only processing new transactions. To reprocess everything from scratch, delete `data/working/calculated_holdings.csv` first.
+
+### Alternative: Fetch via Trade Republic API (Experimental)
+
+Instead of downloading PDFs manually, you can fetch your portfolio directly using [pytr](https://github.com/pytr-org/pytr):
+
+```bash
+# Install pytr
+pip install pytr
+
+# Fetch portfolio (requires 4-digit code from TR app)
+pytr portfolio --output /tmp/pytr_raw.csv
+
+# Convert to pipeline format
+echo "ISIN,Quantity" > data/working/calculated_holdings.csv
+tail -n +2 /tmp/pytr_raw.csv | cut -d';' -f2,3 | tr ';' ',' >> data/working/calculated_holdings.csv
+
+# Run pipeline (skips PDF parsing)
+python -m scripts.run_pipeline
+```
+
+> **Note:** pytr uses Trade Republic's unofficial API. You'll need to enter a 4-digit verification code from your TR app each session.
 
 ### 7. View the Dashboard
 ```bash

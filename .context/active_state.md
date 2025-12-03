@@ -1,82 +1,66 @@
-# Active State: Documentation & MVP Planning (Phase 7)
+# Active State: pytr Integration POC Complete
 
 ## Status: COMPLETE
 
-Restructured README for user-friendly onboarding and created MVP migration plan.
+Successfully validated pytr as Trade Republic API client for portfolio fetching.
 
 ## Session Summary
 
-### Goals Achieved
-1. Fixed README to reflect actual Trade Republic PDF workflow (not CSV)
-2. Created comprehensive MVP migration plan for Docker deployment
-3. Added missing documentation (.env.example, API key setup)
-4. Simplified architecture diagram for readability
+### What Was Done
+1. **Installed pytr** - v0.4.2 via pip
+2. **Tested authentication** - Web login with 4-digit code from TR app
+3. **Fetched portfolio** - 30 positions, €41,729.37 total value
+4. **Converted format** - pytr semicolon CSV → pipeline comma CSV
+5. **Ran pipeline** - Successful, €41,641.49 calculated (0.2% match)
+6. **Verified dashboard** - All features working
 
-### Documentation Updates
+### Key Findings
 
-**README.md restructured:**
-- 5-Minute Quickstart now first section
-- Trade Republic PDF workflow (not manual CSV)
-- API key setup with Finnhub registration link
-- Dashboard section added
-- Simplified Mermaid diagram (PDF → Parse → Prices → ETF Decomposition → Dashboard)
-- Troubleshooting table with PDF-specific issues
-- Detailed architecture in collapsible section
+| Finding | Detail |
+|---------|--------|
+| pytr works | Fetches live holdings with ISIN + quantity |
+| Auth required | 4-digit code each session (web login) |
+| ISINs corrected | 4 ISINs updated vs PDF-derived data |
+| Value matches | pytr €41,729 ≈ pipeline €41,641 (0.2%) |
 
-**New files created:**
-- `.env.example` - Template with required/optional API keys
-- `docs/plans/MVP-plan.md` - Comprehensive POC→MVP migration plan
-
-### MVP Plan Highlights
-
-**Target:** Enable friends & family to test with minimal friction
-
-**Key Decisions:**
-1. **Input:** Trade Republic PDF (primary), no CSV alternative
-2. **Deployment:** Docker container (baked API keys, zero Python setup)
-3. **Selenium:** Remove dependency, use pre-cached ETF holdings + manual upload
-4. **API Keys:** Bake Finnhub key into Docker for friends/family testing
-
-**Phases:**
-1. Documentation (DONE)
-2. CSV Upload mode in dashboard (future)
-3. Remove Selenium dependency (future)
-4. Docker container (future)
-5. UX polish (future)
+### New ISINs Discovered
+- `AU0000066086` - Vulcan Energy (was AU0000066006)
+- `CA87320M2004` - TAAT Global (was CA87320L1031)
+- `DE000TKMS001` - TKMS AG (was DE000TKMS000)
+- `XF000BTC0017` - Bitcoin (new)
 
 ## Files Modified
 
-- `README.md` - Complete restructure for Trade Republic workflow
-- `.context/active_state.md` - This file
-- `.context/handover.md` - Updated handover
+### Config Files
+- `config/asset_universe.csv` - Added 4 new ISINs
+- `config/ticker_map.json` - Added 4 new ticker mappings
 
-## Files Created
+### Documentation
+- `README.md` - Added "Currently in Development" section + pytr workflow
+- `docs/plans/MVP-plan.md` - Marked Phase 1 complete
+- `docs/plans/pytr-test-plan.md` - Created comprehensive test plan
 
-- `.env.example` - API key template
-- `docs/plans/MVP-plan.md` - MVP migration plan
+### Data
+- `data/working/calculated_holdings.csv` - Now contains pytr-fetched data
+- `data/working/calculated_holdings.csv.backup.pre_pytr` - Backup of PDF-derived data
 
-## Pipeline Status
-
-- Portfolio value: €41,920.09 (correct)
-- 27/30 positions validated
-- 3 delisted securities (€114, 0.3%)
-- Dashboard ready at localhost:8501
-
-## Commands
+## pytr Workflow
 
 ```bash
+# Fetch (requires 4-digit code)
+pytr portfolio --output /tmp/pytr_raw.csv
+
+# Convert
+echo "ISIN,Quantity" > data/working/calculated_holdings.csv
+tail -n +2 /tmp/pytr_raw.csv | cut -d';' -f2,3 | tr ';' ',' >> data/working/calculated_holdings.csv
+
 # Run pipeline
-bash run.sh
-
-# View dashboard
-./run_dashboard.sh
-
-# Validate portfolio
-python3 scripts/validate_portfolio.py
+python -m scripts.run_pipeline
 ```
 
-## Next Steps
+## Next Steps (Phase 2)
 
-1. **Test with techy friend** - Use current README, gather feedback
-2. **Docker container** - Phase 5 of MVP plan
-3. **Remove Selenium** - Pre-cache Amundi ETFs
+1. Create `scripts/fetch_tr.py` wrapper script
+2. Add pytr to requirements.txt
+3. Handle session persistence
+4. Error handling for auth failures

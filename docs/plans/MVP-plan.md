@@ -1,6 +1,6 @@
 # POC to MVP Migration Plan
 
-> **Status:** Work in Progress  
+> **Status:** Phase 1 Complete (pytr POC validated)  
 > **Last Updated:** 2025-12-03  
 > **Goal:** Enable friends & family to test the tool with minimal friction
 
@@ -51,10 +51,46 @@
 - [ ] User-friendly error messages
 
 #### Out of Scope (Future)
-- Trade Republic API integration
+- ~~Trade Republic API integration~~ → **Now in scope! (pytr POC validated)**
 - Multi-broker PDF support
 - User accounts / portfolio saving
 - Mobile app
+
+---
+
+## Phase 1: pytr Integration (COMPLETED 2025-12-03)
+
+### What Was Done
+- Validated [pytr](https://github.com/pytr-org/pytr) as Trade Republic API client
+- Successfully fetched live portfolio data (30 positions, €41,729)
+- Integrated with existing pipeline (0.2% discrepancy vs pytr value)
+- Documented workflow in README and test plan
+
+### Key Findings
+1. **pytr works reliably** - Fetches current holdings with ISIN + quantity
+2. **Web login preferred** - 4-digit code required each session, keeps phone logged in
+3. **Credentials file** - Stored in `~/.pytr/credentials`
+4. **Format conversion** - Simple one-liner transforms pytr output to pipeline format
+5. **Correct ISINs** - pytr provided 4 corrected ISINs vs PDF-derived data
+
+### Workflow
+```bash
+# 1. Fetch portfolio (enter 4-digit code when prompted)
+pytr portfolio --output /tmp/pytr_raw.csv
+
+# 2. Convert to pipeline format
+echo "ISIN,Quantity" > data/working/calculated_holdings.csv
+tail -n +2 /tmp/pytr_raw.csv | cut -d';' -f2,3 | tr ';' ',' >> data/working/calculated_holdings.csv
+
+# 3. Run pipeline
+python -m scripts.run_pipeline
+```
+
+### Next Steps for Phase 2
+- [ ] Create `scripts/fetch_tr.py` to wrap pytr workflow
+- [ ] Add pytr to requirements.txt
+- [ ] Handle session persistence (--save-cookies)
+- [ ] Error handling for auth failures
 
 ---
 
