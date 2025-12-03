@@ -190,47 +190,40 @@ outputs/
 ## 🏗 How It Works
 
 ```mermaid
-flowchart LR
-    subgraph Input["📥 Your Data"]
-        PDF["Trade Republic<br/>PDF Statement"]
+flowchart TB
+    subgraph Input["📥 Your Portfolio"]
+        API["🔌 Trade Republic API"]
+        PDF["📄 PDF Export"]
     end
 
-    subgraph Parse["🔍 Parse"]
-        Parser["Extract Trades"]
-        Holdings["Calculate<br/>Holdings"]
+    Holdings["📊 Your Holdings"]
+
+    subgraph Magic["✨ The Magic"]
+        Prices["💹 Live Prices"]
+        ETF["🔬 ETF X-Ray"]
     end
 
-    subgraph Pricing["💹 Prices"]
-        YF["Yahoo Finance"]
-    end
+    Results["📈 True Exposure"]
+    Dashboard["🖥️ Dashboard"]
 
-    subgraph ETF["🔬 ETF Decomposition"]
-        iShares["iShares"]
-        VanEck["VanEck"]
-        Xtrackers["Xtrackers"]
-        Amundi["Amundi"]
-    end
+    API -->|"⭐ Recommended"| Holdings
+    PDF -.->|"Fallback"| Holdings
+    Holdings --> Prices
+    Prices --> ETF
+    ETF --> Results
+    Results --> Dashboard
 
-    subgraph Analysis["📊 Analysis"]
-        Aggregate["Aggregate<br/>by Stock"]
-    end
-
-    subgraph Output["📤 Results"]
-        Report["True Exposure<br/>Report"]
-        Dashboard["Dashboard"]
-    end
-
-    PDF --> Parser --> Holdings --> YF
-    YF --> iShares & VanEck & Xtrackers & Amundi
-    iShares & VanEck & Xtrackers & Amundi --> Aggregate
-    Aggregate --> Report & Dashboard
+    style API fill:#10b981,stroke:#059669,color:#fff
+    style PDF fill:#6b7280,stroke:#4b5563,color:#fff
+    style Results fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style Dashboard fill:#8b5cf6,stroke:#7c3aed,color:#fff
 ```
 
 ### Pipeline Stages
 
 | Stage | What Happens |
 |-------|--------------|
-| **1. Parse PDF** | Extract buy/sell transactions from Trade Republic statements |
+| **1. Fetch Portfolio** | Get holdings via Trade Republic API (recommended) or parse PDF exports (fallback) |
 | **2. Calculate Holdings** | Sum quantities per ISIN to get current positions |
 | **3. Fetch Prices** | Get live EUR prices from Yahoo Finance |
 | **4. Identify ETFs** | Separate stocks from ETFs |
@@ -291,109 +284,91 @@ ruff format .
 ```mermaid
 flowchart TB
     subgraph Input["📥 INPUT LAYER"]
-        PDF["📄 PDF Statements<br/>(Trade Republic)"]
-        Universe["📋 asset_universe.csv<br/>(ISIN Master)"]
-        Holdings["📊 calculated_holdings.csv<br/>(Quantities)"]
-        ManualETF["📁 Manual ETF Files<br/>(Amundi Escape Hatch)"]
+        API["🔌 pytr API<br/>(Live Data)"]
+        PDF["📄 PDF Statements<br/>(Fallback)"]
+        Universe["📋 asset_universe.csv"]
+        ManualETF["📁 Manual ETF Files"]
     end
 
     subgraph Parse["🔍 PARSING"]
-        Parser["PDF Parser<br/>(pdfplumber + multiprocessing)"]
-        Trades["Parsed Trades<br/>(ISIN, Qty, Price)"]
+        Parser["PDF Parser"]
+        Trades["Parsed Trades"]
     end
 
-    subgraph State["📦 STATE LOADING"]
+    Holdings["📊 calculated_holdings.csv"]
+
+    subgraph State["📦 STATE"]
         StateMgr["State Manager"]
-        Direct["Direct Holdings<br/>(Stocks)"]
+        Direct["Direct Holdings"]
         ETFs["ETF Positions"]
     end
 
     subgraph Market["💹 MARKET DATA"]
-        YFinance["Yahoo Finance<br/>(yfinance)"]
-        Prices["Live Prices<br/>(EUR normalized)"]
-        DirectReport["Direct Holdings Report"]
+        YFinance["Yahoo Finance"]
+        Prices["Live Prices (EUR)"]
     end
 
     subgraph Decompose["🔬 ETF DECOMPOSITION"]
-        Registry["Adapter Registry"]
-        subgraph Adapters["Provider Adapters"]
-            iShares["iShares<br/>(API)"]
-            VanEck["VanEck<br/>(Direct DL)"]
-            Xtrackers["Xtrackers<br/>(Direct DL)"]
-            Amundi["Amundi<br/>(Manual)"]
-        end
-        ETFHoldings["ETF Holdings<br/>(Ticker, Weight%)"]
+        iShares["iShares"]
+        VanEck["VanEck"]
+        Xtrackers["Xtrackers"]
+        Amundi["Amundi"]
+        ETFHoldings["ETF Holdings"]
     end
 
-    subgraph Enrich["🧬 ISIN RESOLUTION"]
-        Classification["Asset Classification<br/>(Equity/Cash/Derivative)"]
-        TierSplit["Tiered Split<br/>(>1% vs ≤1%)"]
-        subgraph Resolution["Resolution Priority"]
-            Provider["1. Provider ISIN"]
-            Local["2. Universe Lookup"]
-            Cache["3. Cache Lookup"]
-            subgraph APIs["4. APIs (Tier 1 only)"]
-                Finnhub["Finnhub"]
-                Wikidata["Wikidata"]
-                YF2["YFinance"]
-            end
-        end
-        Unresolved["Unresolved Report"]
+    subgraph Enrich["🧬 ENRICHMENT"]
+        Classification["Asset Classification"]
+        Resolution["ISIN Resolution"]
+        Finnhub["Finnhub API"]
+        Wikidata["Wikidata"]
     end
 
     subgraph Aggregate["📊 AGGREGATION"]
         DirectVal["Direct Values"]
-        IndirectVal["Indirect Values<br/>(ETF × Weight%)"]
-        GroupBy["Group by ISIN<br/>(or Fallback Key)"]
-        TotalExp["Total Exposure<br/>(Direct + Indirect)"]
+        IndirectVal["Indirect Values"]
+        TotalExp["Total Exposure"]
     end
 
-    subgraph Output["📤 OUTPUT LAYER"]
+    subgraph Output["📤 OUTPUT"]
         TrueExp["true_exposure_report.csv"]
         Top10["top_10_holdings.csv"]
         Sector["sector_exposure.csv"]
-        Geo["geography_exposure.csv"]
         Health["PIPELINE_HEALTH.md"]
     end
 
-    subgraph Validate["✅ VALIDATION"]
-        ValCheck["Value Conservation<br/>No Negatives<br/>Completeness"]
+    subgraph UI["🖥️ DASHBOARD"]
+        Dashboard["Streamlit App"]
     end
 
-    subgraph Learn["🧠 AUTO-LEARNING"]
-        Harvest["Harvest Enrichment"]
-        UpdateUni["Update Universe"]
-    end
+    API ==>|"⭐ Recommended"| Holdings
+    PDF -.->|"Fallback"| Parser
+    Parser -.-> Trades -.-> Holdings
 
-    PDF --> Parser --> Trades
     Universe --> StateMgr
     Holdings --> StateMgr
     StateMgr --> Direct & ETFs
 
-    Direct --> YFinance
-    ETFs --> YFinance
-    YFinance --> Prices
-    Prices --> DirectReport
-    Prices --> Direct & ETFs
+    Direct & ETFs --> YFinance --> Prices
 
-    ETFs --> Registry
+    ETFs --> iShares & VanEck & Xtrackers & Amundi
     ManualETF --> Amundi
-    Registry --> iShares & VanEck & Xtrackers & Amundi
     iShares & VanEck & Xtrackers & Amundi --> ETFHoldings
 
-    ETFHoldings --> Classification --> TierSplit
-    TierSplit --> Provider --> Local --> Cache
-    Cache --> Finnhub --> Wikidata --> YF2
-    YF2 --> Unresolved
+    ETFHoldings --> Classification --> Resolution
+    Resolution --> Finnhub & Wikidata
 
     Direct --> DirectVal
     ETFHoldings --> IndirectVal
-    DirectVal & IndirectVal --> GroupBy --> TotalExp
+    DirectVal & IndirectVal --> TotalExp
 
-    TotalExp --> TrueExp & Top10 & Sector & Geo
-    TrueExp --> ValCheck --> Health
+    TotalExp --> TrueExp & Top10 & Sector & Health
+    TrueExp --> Dashboard
 
-    Cache --> Harvest --> UpdateUni --> Universe
+    style API fill:#10b981,stroke:#059669,color:#fff
+    style PDF fill:#6b7280,stroke:#4b5563,color:#fff
+    style TrueExp fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style Dashboard fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style Holdings fill:#3b82f6,stroke:#2563eb,color:#fff
 ```
 
 </details>
