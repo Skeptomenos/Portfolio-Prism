@@ -115,3 +115,9 @@
 - **Cached Data Loading:** Use `@st.cache_data` decorator on all file I/O functions. Prevents re-reading CSVs/JSON on every widget interaction. Clear cache after saves: `st.cache_data.clear()`.
 - **Plotly over Matplotlib:** For web dashboards, Plotly provides interactivity (zoom, hover, filter) out-of-the-box. Matplotlib static images lack these UX benefits.
 - **Incremental Implementation:** Build dashboards tab-by-tab with placeholders for future tabs. Allows iterative deployment and user feedback before full completion.
+
+### Phase 17: Test Isolation & Output Protection (2025-12-03)
+- **Test Pollution:** Tests that write to real output paths silently corrupt production data. Tests pass but dashboard shows wrong data. **Rule:** All file outputs in tests must use `tempfile.TemporaryDirectory()` or patch/mock output paths.
+- **Centralized Paths:** Hardcoded paths like `"outputs/file.csv"` are non-configurable and fragile. **Rule:** Centralize all output paths in `src/config.py`.
+- **Patch Location:** When patching constants, patch where they're **used**, not where they're **defined** (e.g., `@patch("src.core.aggregation.HOLDINGS_BREAKDOWN_PATH")` not `@patch("src.config.HOLDINGS_BREAKDOWN_PATH")`).
+- **Incremental Verification:** After any pipeline run, verify key outputs (row counts, sample data) to catch corruption early.

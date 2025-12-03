@@ -1,67 +1,57 @@
-# Handover: ISIN Resolution Architecture Refactor (2025-12-02)
+# Handover: Dashboard Fuzzy Search & Test Isolation (2025-12-03)
 
 ## Status: COMPLETE
 
-Completed major architecture refactor to fix ISIN resolution pollution. The pipeline now correctly handles ISIN resolution with explicit status tracking.
+Completed dashboard UX improvements for Stock Lookup and fixed critical test isolation bug.
 
-## Problem Solved
-ISIN enrichment was creating invalid composite keys (`FALLBACK|ticker|name`) that:
-1. Polluted the enrichment cache
-2. Were sent to external APIs causing 404 errors
-3. Caused pipeline timeouts
-4. Corrupted the `isin` column with non-ISIN values
+## What Was Done
 
-## Solution Implemented
+### 1. Dashboard Fuzzy Search Enhancement
+- Replaced dropdown with text input (3-char minimum)
+- Shows matching securities as expandable cards
+- Sort options: Name (A-Z), Total Exposure, Direct %
+- First 3 results expanded, rest collapsed
+- Maximum 20 results with "refine search" message
 
-### New Modules
-- `src/data/resolution.py` - Unified ISIN resolution with priority order
-- `src/utils/isin_validator.py` - ISIN validation with Luhn checksum
-- `tests/test_resolution.py` - 24 unit tests for resolution module
+### 2. Stock Lookup Duplicate Bug Fix
+- **Problem**: Alphabet showed 6 times with different name variants
+- **Root Cause**: Dashboard grouped by `name` instead of `ISIN`
+- **Fix**: Group by ISIN, use canonical name from `asset_universe.csv`
+- Added `get_isin_name_mapping()` helper to `src/dashboard/utils.py`
+- Removed duplicate ISIN (`US02079K1079`) from `asset_universe.csv`
+- Added duplicate detection warning in `AssetUniverse.load()`
 
-### Key Changes
-1. **Resolution Priority**: Provider ISIN -> Universe ticker -> Universe alias -> Cache -> API (Tier 1 only)
-2. **Group Key Format**: `UNRESOLVED:{ticker}:{hash10}` replaces `FALLBACK|ticker|name`
-3. **Status Tracking**: Holdings have `resolution_status` and `resolution_detail` columns
-4. **Cache Protection**: `auto_clean_cache()` and input validation prevent future pollution
-5. **Unresolved Report**: `outputs/unresolved_holdings.csv` generated for user action
+### 3. Test Isolation Fix
+- **Problem**: Running `pytest` overwrote `outputs/holdings_breakdown.csv` with test data
+- **Root Cause**: Hardcoded path in `run_aggregation()`
+- **Fix**: 
+  - Added `HOLDINGS_BREAKDOWN_PATH` to `src/config.py`
+  - Updated `src/core/aggregation/__init__.py` to use config path
+  - Patched both test files to write to temp directories
 
-## Pipeline Output
-```
-Resolution Summary:
-- Total processed: 3,153 holdings
-- Resolved: 1,658 (52.6%)
-- Unresolved: 0 (0.0%)
-- Skipped (Tier2): 1,495 (47.4%)
-
-By source:
-- universe_ticker: 1,626
-- tier2_skipped: 1,495
-- provider: 32
-```
+## Commits
+- `003cf75` feat(dashboard): add fuzzy search for stock lookup, fix test isolation
 
 ## Test Status
-- All 47 tests passing (23 original + 24 new resolution tests)
-- Pipeline completes successfully without timeout
+- All 47 tests passing
+- Production breakdown file (4376 lines) preserved after test runs
 
 ## Files Modified
-- `src/data/resolution.py` (NEW)
-- `src/utils/isin_validator.py` (NEW)
-- `src/data/caching.py` (added validation)
-- `src/core/aggregation/grouping.py` (new group key format)
-- `src/core/aggregation/enrichment.py` (uses resolution module)
-- `src/core/reporting.py` (filters by resolution_status)
-- `tests/test_resolution.py` (NEW)
-- `tests/test_aggregation.py` (updated for valid ISINs)
-- `tests/test_aggregation_v2.py` (updated group key test)
-- `tests/test_integration.py` (widened assertion bounds)
+- `src/config.py` - Added `HOLDINGS_BREAKDOWN_PATH`
+- `src/core/aggregation/__init__.py` - Use config path
+- `src/dashboard/tabs/holdings_analysis.py` - Fuzzy search rewrite
+- `src/dashboard/utils.py` - Added `get_isin_name_mapping()`
+- `src/data/resolution.py` - Duplicate ISIN warning
+- `config/asset_universe.csv` - Removed duplicate
+- `tests/test_aggregation.py` - Temp directory patch
+- `tests/test_integration.py` - Temp directory patch
 
 ## Launch
 ```bash
-PYTHONPATH=. python3 scripts/run_full_pipeline.py
 ./run_dashboard.sh
+pytest  # Safe - won't corrupt production data
 ```
 
-## Next Steps (Optional)
-- Add more ISINs to `asset_universe.csv` to reduce unresolved holdings
-- Monitor `outputs/unresolved_holdings.csv` for high-value unresolved items
-- Consider adding Wikidata as additional resolution source
+## Next Steps
+- Consider adding more output paths to config (e.g., `TRUE_EXPOSURE_REPORT` already there)
+- Backlog item added for CI check on output file protection

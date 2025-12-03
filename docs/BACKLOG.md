@@ -4,3 +4,4 @@ This document tracks feature requests and known limitations, automatically gener
 
 
 - [ ] Create adapter for provider: 'vanguard' (Triggered by ISIN: DE0007500001 on 2025-11-23)
+- [ ] Add CI check or pre-commit hook to verify critical output files aren't modified by test runs (Test Isolation - 2025-12-03)
