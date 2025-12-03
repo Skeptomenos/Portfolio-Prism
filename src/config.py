@@ -20,6 +20,7 @@ REPORTS_DIR = OUTPUTS_DIR  # For now, reports go to root of outputs
 
 # File Paths
 TRUE_EXPOSURE_REPORT = REPORTS_DIR / "true_exposure_report.csv"
+HOLDINGS_BREAKDOWN_PATH = OUTPUTS_DIR / "holdings_breakdown.csv"
 TRADES_FILE = OUTPUTS_DIR / "trades.csv"
 POSITIONS_FILE = OUTPUTS_DIR / "positions_with_prices.csv"
 

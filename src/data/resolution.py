@@ -81,6 +81,16 @@ class AssetUniverse:
         try:
             df = pd.read_csv(ASSET_UNIVERSE_PATH)
 
+            # Check for duplicate ISINs and warn
+            duplicates = df[df["ISIN"].duplicated(keep=False)]
+            if not duplicates.empty:
+                dup_isins = duplicates["ISIN"].unique().tolist()
+                logger.warning(
+                    f"Duplicate ISINs found in asset_universe.csv: {dup_isins}. "
+                    "Keeping first occurrence only."
+                )
+                df = df.drop_duplicates(subset=["ISIN"], keep="first")
+
             # Build ticker index (Yahoo_Ticker -> ISIN)
             ticker_index = {}
             for _, row in df.iterrows():

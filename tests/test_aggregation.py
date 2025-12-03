@@ -1,7 +1,10 @@
 """Tests for the aggregation module."""
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -20,65 +23,77 @@ class TestAggregation(unittest.TestCase):
 
         Updated to use valid ISINs for the new resolution architecture.
         """
-        # 1. Define Input DataFrames with valid ISINs
-        # US0378331005 = Apple Inc (valid ISIN)
-        # US5949181045 = Microsoft Corp (valid ISIN)
-        # US02079K3059 = Alphabet Inc (valid ISIN)
-        # DE000A0F5UF5 = iShares NASDAQ-100 ETF (valid ETF ISIN)
-        # IE00B53SZB19 = iShares NASDAQ 100 ETF (valid ETF ISIN)
+        # Use temp directory to avoid polluting production data
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_breakdown = Path(tmpdir) / "holdings_breakdown.csv"
 
-        direct_positions = pd.DataFrame(
-            {
-                "isin": ["US0378331005"],
-                "name": ["Apple Inc."],
-                "market_value": [100.00],
-            }
-        )
-        etf_positions = pd.DataFrame(
-            {
-                "isin": ["DE000A0F5UF5", "IE00B53SZB19"],
-                "name": ["Tech 1", "Tech 2"],
-                "market_value": [1000.00, 2000.00],
-            }
-        )
+            with patch("src.core.aggregation.HOLDINGS_BREAKDOWN_PATH", tmp_breakdown):
+                # 1. Define Input DataFrames with valid ISINs
+                # US0378331005 = Apple Inc (valid ISIN)
+                # US5949181045 = Microsoft Corp (valid ISIN)
+                # US02079K3059 = Alphabet Inc (valid ISIN)
+                # DE000A0F5UF5 = iShares NASDAQ-100 ETF (valid ETF ISIN)
+                # IE00B53SZB19 = iShares NASDAQ 100 ETF (valid ETF ISIN)
 
-        # ETF holdings with valid ISINs
-        holdings1 = pd.DataFrame(
-            {
-                "isin": ["US0378331005", "US5949181045"],
-                "name": ["Apple", "Microsoft"],
-                "weight_percentage": [10.0, 20.0],
-            }
-        )
-        holdings2 = pd.DataFrame(
-            {
-                "isin": ["US0378331005", "US02079K3059"],
-                "name": ["Apple", "Google"],
-                "weight_percentage": [5.0, 15.0],
-            }
-        )
+                direct_positions = pd.DataFrame(
+                    {
+                        "isin": ["US0378331005"],
+                        "name": ["Apple Inc."],
+                        "market_value": [100.00],
+                    }
+                )
+                etf_positions = pd.DataFrame(
+                    {
+                        "isin": ["DE000A0F5UF5", "IE00B53SZB19"],
+                        "name": ["Tech 1", "Tech 2"],
+                        "market_value": [1000.00, 2000.00],
+                    }
+                )
 
-        etf_holdings_map = {"DE000A0F5UF5": holdings1, "IE00B53SZB19": holdings2}
+                # ETF holdings with valid ISINs
+                holdings1 = pd.DataFrame(
+                    {
+                        "isin": ["US0378331005", "US5949181045"],
+                        "name": ["Apple", "Microsoft"],
+                        "weight_percentage": [10.0, 20.0],
+                    }
+                )
+                holdings2 = pd.DataFrame(
+                    {
+                        "isin": ["US0378331005", "US02079K3059"],
+                        "name": ["Apple", "Google"],
+                        "weight_percentage": [5.0, 15.0],
+                    }
+                )
 
-        # 2. Run the aggregation logic
-        output_file = str(TRUE_EXPOSURE_REPORT)
-        if os.path.exists(output_file):
-            os.remove(output_file)
+                etf_holdings_map = {
+                    "DE000A0F5UF5": holdings1,
+                    "IE00B53SZB19": holdings2,
+                }
 
-        run_aggregation(direct_positions, etf_positions, etf_holdings_map)
+                # 2. Run the aggregation logic
+                output_file = str(TRUE_EXPOSURE_REPORT)
+                if os.path.exists(output_file):
+                    os.remove(output_file)
 
-        self.assertTrue(os.path.exists(output_file))
-        actual_df = pd.read_csv(output_file)
+                run_aggregation(direct_positions, etf_positions, etf_holdings_map)
 
-        # 3. Define Expected Outcome and Assert
-        aapl_row = actual_df[actual_df["isin"] == "US0378331005"]
-        self.assertFalse(aapl_row.empty)
+                self.assertTrue(os.path.exists(output_file))
+                actual_df = pd.read_csv(output_file)
 
-        self.assertAlmostEqual(float(aapl_row["direct"].iloc[0]), 100.0, places=2)
-        self.assertAlmostEqual(float(aapl_row["indirect"].iloc[0]), 200.0, places=2)
-        self.assertAlmostEqual(
-            float(aapl_row["total_exposure"].iloc[0]), 300.0, places=2
-        )
+                # 3. Define Expected Outcome and Assert
+                aapl_row = actual_df[actual_df["isin"] == "US0378331005"]
+                self.assertFalse(aapl_row.empty)
+
+                self.assertAlmostEqual(
+                    float(aapl_row["direct"].iloc[0]), 100.0, places=2
+                )
+                self.assertAlmostEqual(
+                    float(aapl_row["indirect"].iloc[0]), 200.0, places=2
+                )
+                self.assertAlmostEqual(
+                    float(aapl_row["total_exposure"].iloc[0]), 300.0, places=2
+                )
 
 
 if __name__ == "__main__":

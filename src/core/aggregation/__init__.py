@@ -12,7 +12,7 @@ from typing import Dict
 
 import pandas as pd
 
-from src.config import TRUE_EXPOSURE_REPORT
+from src.config import HOLDINGS_BREAKDOWN_PATH, TRUE_EXPOSURE_REPORT
 from src.models import AggregatedExposure
 from src.utils.logging_config import get_logger
 
@@ -158,9 +158,9 @@ def run_aggregation(
                 }
             )
 
-            output_breakdown.to_csv("outputs/holdings_breakdown.csv", index=False)
+            output_breakdown.to_csv(HOLDINGS_BREAKDOWN_PATH, index=False)
             logger.info(
-                "Saved detailed holdings breakdown to outputs/holdings_breakdown.csv"
+                f"Saved detailed holdings breakdown to {HOLDINGS_BREAKDOWN_PATH}"
             )
         except Exception as e:
             logger.error(f"Failed to save breakdown CSV: {e}")

@@ -1,6 +1,8 @@
 """Integration tests for the aggregation pipeline."""
 
 import os
+import tempfile
+from pathlib import Path
 from typing import Dict
 from unittest.mock import MagicMock, patch
 
@@ -33,6 +35,10 @@ def mock_asset_universe() -> Dict[str, str]:
     )
 
 
+@patch(
+    "src.core.aggregation.HOLDINGS_BREAKDOWN_PATH",
+    Path(tempfile.gettempdir()) / "test_holdings_breakdown.csv",
+)
 @patch("src.core.aggregation.finalize_and_save")
 @patch("src.adapters.ishares.requests.get")
 @patch("src.data.enrichment.load_asset_universe")
