@@ -13,3 +13,4 @@ tqdm
 streamlit>=1.30.0
 plotly>=5.18.0
 pandas>=2.0.0
+pytr>=0.4.2

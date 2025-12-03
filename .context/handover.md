@@ -1,75 +1,74 @@
-# Handover: pytr Integration POC (2025-12-03)
+# Handover: pytr Deep Integration Complete (2025-12-03)
 
-## Status: COMPLETE
+## Status: COMPLETE (v0.2.0)
 
-Successfully validated pytr as Trade Republic API client. Ready for Phase 2 deeper integration.
+Successfully implemented Phase 2 pytr deep integration. Users can now run `bash run.sh` and fetch portfolio via Trade Republic API with a single command.
 
 ## What Was Done
 
-### pytr Integration Test
-1. Installed pytr v0.4.2
-2. Authenticated via web login (4-digit code)
-3. Fetched 30 positions (€41,729)
-4. Converted to pipeline format
-5. Ran full pipeline successfully
-6. Verified dashboard works
+### Phase 2: pytr Deep Integration
+1. Created `scripts/fetch_tr_api.py` - full pytr wrapper with:
+   - Credential management (load from `.env`, prompt if missing)
+   - Privacy notice for first-run
+   - `--reconfigure` flag to update credentials
+   - Auto-backup with timestamp before overwrite
+   - Session cookies in `~/.pytr/cookies/`
+   - Error handling with PDF fallback suggestions
 
-### Documentation Updates
-- README.md: Added "Currently in Development" section with pytr reference
-- README.md: Added alternative pytr workflow in Quickstart
-- MVP-plan.md: Marked Phase 1 complete, added findings
-- pytr-test-plan.md: Created comprehensive test documentation
+2. Rewrote `run.sh` with:
+   - Interactive menu (API default, PDF fallback)
+   - Waits indefinitely for user input
+   - Graceful fallback on API failure
 
-### Data Updates
-- Added 4 new ISINs to asset_universe.csv
-- Added 4 new tickers to ticker_map.json
-- Updated calculated_holdings.csv with pytr data
+3. Updated documentation:
+   - README.md: New quickstart with API-first workflow
+   - .env.example: Added TR credentials placeholders
+   - requirements.txt: Added pytr>=0.4.2
 
-## Key Insight
-
-> **pytr provides correct, live ISINs** - The PDF-derived data had 4 outdated/incorrect ISINs. pytr fetched the current correct ones directly from Trade Republic's systems.
-
-## pytr Workflow (Current)
+## New User Workflow
 
 ```bash
-# 1. Fetch (enter 4-digit code when prompted)
-pytr portfolio --output /tmp/pytr_raw.csv
-
-# 2. Convert format
-echo "ISIN,Quantity" > data/working/calculated_holdings.csv
-tail -n +2 /tmp/pytr_raw.csv | cut -d';' -f2,3 | tr ';' ',' >> data/working/calculated_holdings.csv
-
-# 3. Run pipeline
-python -m scripts.run_pipeline
+bash run.sh
+# Select [1] Trade Republic API (press Enter for default)
+# First run: Enter phone + PIN (saved to .env)
+# Enter 4-digit code from TR app
+# Done! Pipeline runs automatically
 ```
 
-## Next Steps (Phase 2)
-
-1. **Create wrapper script** - `scripts/fetch_tr.py`
-2. **Add to requirements.txt** - Make pytr official dependency
-3. **Session persistence** - Use `--save-cookies` to reduce auth prompts
-4. **Error handling** - Graceful fallback to PDF if auth fails
-
-## Files Changed This Session
+## Key Files Changed
 
 | File | Change |
 |------|--------|
-| README.md | Added pytr integration status + workflow |
-| docs/plans/MVP-plan.md | Marked Phase 1 complete |
-| docs/plans/pytr-test-plan.md | New test documentation |
-| config/asset_universe.csv | Added 4 new ISINs |
-| config/ticker_map.json | Added 4 new tickers |
-| data/working/calculated_holdings.csv | pytr-fetched data |
+| `scripts/fetch_tr_api.py` | **New** - pytr wrapper script |
+| `run.sh` | **Rewritten** - Interactive menu |
+| `requirements.txt` | Added pytr>=0.4.2 |
+| `.env.example` | Added TR_PHONE_NO, TR_PIN |
+| `README.md` | Updated quickstart |
+| `docs/plans/MVP-plan.md` | Phase 2 complete |
+| `CHANGELOG.md` | Added v0.2.0 release notes |
+| `PROJECT_LEARNINGS.md` | Added Phase 19 learnings |
+
+## Next Steps (MVP Phases 3-6)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 3 | Remove Selenium Dependency | Pending |
+| Phase 4 | Reduce API Dependency | Pending |
+| Phase 5 | Docker Container | Pending |
+| Phase 6 | UX Polish | Pending |
 
 ## Quick Commands
 
 ```bash
-# Run with pytr data
-python -m scripts.run_pipeline
+# Run with API (recommended)
+bash run.sh  # Select option 1
+
+# Update credentials
+python scripts/fetch_tr_api.py --reconfigure
 
 # View dashboard
 ./run_dashboard.sh
 
-# Restore PDF-derived data if needed
-cp data/working/calculated_holdings.csv.backup.pre_pytr data/working/calculated_holdings.csv
+# Run tests
+pytest
 ```

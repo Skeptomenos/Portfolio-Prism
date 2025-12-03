@@ -129,3 +129,10 @@
 - **Validation-Driven Development:** Build validation scripts BEFORE fixing data. The `validate_portfolio.py` script identified exactly which positions failed, enabling targeted fixes. **Pattern:** Observe → Measure → Fix → Re-measure.
 - **Backup Before Overwrite:** The `recalculate_gt.py` script creates timestamped backups before modifying GT files. **Rule:** Any script that modifies source-of-truth files must create backups automatically.
 - **Delisted Securities:** Some securities (TKMS, TAAT, Cresco Labs) return no price data from yfinance. These are likely delisted or OTC. **Rule:** Flag these as "MANUAL_REQUIRED" rather than silently setting to zero.
+
+### Phase 19: pytr Deep Integration (2025-12-03)
+- **CLI Tool Wrapping:** When integrating external CLI tools (like pytr), subprocess wrapping is often more robust than importing internal modules. CLI contracts are stable; internal APIs change. **Rule:** Prefer `subprocess.run(["tool", "args"])` over `from tool.internal import X` for external dependencies.
+- **Credential Storage Patterns:** Store user credentials in `.env` (local, gitignored) with interactive first-run prompts. Include privacy notice and `--reconfigure` flag for updates. **Rule:** Never store credentials in version control; always provide reconfiguration path.
+- **Auto-Backup on Overwrite:** Before overwriting user data files, create timestamped backups automatically (e.g., `file.2025-12-03_143022.csv.bak`). Users trust tools that preserve their data.
+- **Interactive Menu UX:** For CLI tools with multiple input methods, provide an interactive menu with sensible defaults. "Press Enter for recommended option" reduces friction for new users.
+- **Fallback Messaging:** When primary method fails, provide clear error message + explicit fallback instructions. Don't auto-switch (user should decide) but make alternatives obvious.

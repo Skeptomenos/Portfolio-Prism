@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.0] - 2025-12-03
+
+### Added
+- **Trade Republic API Integration**: Implemented seamless pytr integration for direct portfolio fetching from Trade Republic accounts.
+  - New `scripts/fetch_tr_api.py` wrapper script with full credential management
+  - Interactive menu in `run.sh` (API as default, PDF as fallback)
+  - Privacy notice for first-run credential collection
+  - `--reconfigure` flag to update stored credentials
+  - Auto-backup of `calculated_holdings.csv` with timestamp before each fetch
+  - Session cookie persistence in `~/.pytr/cookies/`
+  - Graceful error handling with PDF fallback suggestions
+
+### Changed
+- **run.sh**: Complete rewrite with interactive portfolio source selection
+- **README.md**: Updated quickstart to reflect new API-first workflow
+- **requirements.txt**: Added `pytr>=0.4.2` dependency
+- **.env.example**: Added `TR_PHONE_NO` and `TR_PIN` placeholders
+
+### Documentation
+- Updated `docs/plans/MVP-plan.md` - Phase 2 marked complete
+- Updated `docs/plans/pytr-phase2-plan.md` with implementation details
+
+---
+
 ## [Phase 16] - 2025-12-02
 
 ### Fixed

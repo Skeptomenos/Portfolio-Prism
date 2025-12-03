@@ -6,12 +6,6 @@ You own ETFs. But what do you *actually* own? This tool breaks apart your ETF wr
 
 ---
 
-## 🚧 Currently in Development
-
-**Trade Republic API Integration** - We're integrating [pytr](https://github.com/pytr-org/pytr), an unofficial Trade Republic API client, to replace manual PDF exports. This will allow automatic portfolio fetching directly from your Trade Republic account.
-
-Status: ✅ POC validated - pytr successfully fetches portfolio data and integrates with the pipeline.
-
 ---
 
 ## 🚀 5-Minute Quickstart
@@ -48,55 +42,58 @@ Edit `.env` and add your Finnhub API key:
 FINNHUB_API_KEY=your_api_key_here
 ```
 
-### 5. Prepare Your Portfolio Data
-
-1. Open **Trade Republic** app
-2. Go to **Profile → Activity → Account Statement** ("Kontoauszug")
-3. Download the PDF (contains all your buy/sell transactions)
-4. Place the PDF in:
-   ```
-   data/inputs/portfolio/
-   ```
-
-> **Tip:** You can add multiple PDFs if you have exports from different time periods. The parser will merge them automatically.
-
-### 6. Run the Pipeline
+### 5. Run the Pipeline
 ```bash
 bash run.sh
 ```
 
-The pipeline will:
-1. **Parse your PDF** - Extract all buy/sell transactions from Trade Republic statements
-2. **Calculate holdings** - Sum up quantities per ISIN to get your current positions
-3. **Fetch live prices** - Get current EUR prices from Yahoo Finance
-4. **Decompose ETFs** - Download underlying holdings from iShares, VanEck, Xtrackers, Amundi
-5. **Calculate true exposure** - Aggregate your real exposure to each stock
-6. **Generate reports** - Save results to `outputs/`
+You'll see an interactive menu:
 
-> **Incremental mode:** The parser runs in `--mode add_new` by default, only processing new transactions. To reprocess everything from scratch, delete `data/working/calculated_holdings.csv` first.
+```
+========================================
+  Portfolio Prism - True Exposure Tool
+========================================
 
-### Alternative: Fetch via Trade Republic API (Experimental)
+How would you like to fetch your portfolio?
 
-Instead of downloading PDFs manually, you can fetch your portfolio directly using [pytr](https://github.com/pytr-org/pytr):
+  [1] Trade Republic API (recommended)
+      Fetches live data directly from your TR account
 
-```bash
-# Install pytr
-pip install pytr
+  [2] PDF Export
+      Uses downloaded 'Kontoauszug' PDFs
 
-# Fetch portfolio (requires 4-digit code from TR app)
-pytr portfolio --output /tmp/pytr_raw.csv
-
-# Convert to pipeline format
-echo "ISIN,Quantity" > data/working/calculated_holdings.csv
-tail -n +2 /tmp/pytr_raw.csv | cut -d';' -f2,3 | tr ';' ',' >> data/working/calculated_holdings.csv
-
-# Run pipeline (skips PDF parsing)
-python -m scripts.run_pipeline
+Select option [1/2] (default: 1): 
 ```
 
-> **Note:** pytr uses Trade Republic's unofficial API. You'll need to enter a 4-digit verification code from your TR app each session.
+#### Option 1: Trade Republic API (Recommended)
 
-### 7. View the Dashboard
+The tool uses [pytr](https://github.com/pytr-org/pytr) to fetch your portfolio directly:
+
+1. **First run:** Enter your Trade Republic phone number and PIN (stored locally in `.env`)
+2. **Verification:** Enter the 4-digit code from your TR app
+3. **Done!** Your portfolio is fetched and analyzed automatically
+
+> **Privacy:** Your credentials are stored locally in `.env` (gitignored) and never uploaded anywhere.
+
+#### Option 2: PDF Export (Alternative)
+
+If API access fails, you can use PDF exports:
+
+1. Open **Trade Republic** app
+2. Go to **Profile → Activity → Account Statement** ("Kontoauszug")
+3. Download the PDF and place it in `data/inputs/portfolio/`
+4. Run `bash run.sh` and select option 2
+
+### What Happens Next
+
+The pipeline will:
+1. **Fetch/Parse holdings** - Get your current positions
+2. **Fetch live prices** - Get current EUR prices from Yahoo Finance
+3. **Decompose ETFs** - Download underlying holdings from iShares, VanEck, Xtrackers, Amundi
+4. **Calculate true exposure** - Aggregate your real exposure to each stock
+5. **Generate reports** - Save results to `outputs/`
+
+### 6. View the Dashboard
 ```bash
 ./run_dashboard.sh
 ```
@@ -254,6 +251,8 @@ flowchart LR
 |---------|----------|
 | `command not found` | Run `source venv/bin/activate` |
 | `FINNHUB_API_KEY not set` | Create `.env` file with your API key |
+| `pytr not found` | Run `pip install pytr` |
+| `pytr authentication failed` | Run `python scripts/fetch_tr_api.py --reconfigure` to update credentials |
 | `No trades found in PDF` | Make sure it's the "Kontoauszug" (Account Statement), not a monthly securities report |
 | `Wrong quantities` | Delete `calculated_holdings.csv` and re-run to reprocess all PDFs |
 | `No price for ISIN` | Check if ticker exists on Yahoo Finance |

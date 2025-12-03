@@ -1,6 +1,6 @@
 # POC to MVP Migration Plan
 
-> **Status:** Phase 1 Complete (pytr POC validated)  
+> **Status:** Phase 2 Complete (pytr Deep Integration)  
 > **Last Updated:** 2025-12-03  
 > **Goal:** Enable friends & family to test the tool with minimal friction
 
@@ -86,11 +86,39 @@ tail -n +2 /tmp/pytr_raw.csv | cut -d';' -f2,3 | tr ';' ',' >> data/working/calc
 python -m scripts.run_pipeline
 ```
 
-### Next Steps for Phase 2
-- [ ] Create `scripts/fetch_tr.py` to wrap pytr workflow
-- [ ] Add pytr to requirements.txt
-- [ ] Handle session persistence (--save-cookies)
-- [ ] Error handling for auth failures
+---
+
+## Phase 2: pytr Deep Integration (COMPLETED 2025-12-03)
+
+### What Was Done
+- Created `scripts/fetch_tr_api.py` - full wrapper for pytr with credential management
+- Updated `run.sh` with interactive menu (API default, PDF fallback)
+- Added pytr to requirements.txt
+- Updated README.md with new workflow documentation
+- Implemented:
+  - Privacy notice for first-run credential collection
+  - Credentials stored in `.env` (local only, gitignored)
+  - `--reconfigure` flag to update credentials
+  - Auto-backup of `calculated_holdings.csv` with timestamp before overwrite
+  - Session cookies stored in `~/.pytr/cookies/`
+  - Graceful error handling with PDF fallback suggestion
+
+### New User Workflow
+```bash
+bash run.sh
+# Select [1] Trade Republic API (default)
+# First run: Enter phone + PIN (saved to .env)
+# Enter 4-digit code from TR app
+# Done! Portfolio analyzed automatically
+```
+
+### Files Changed
+- `scripts/fetch_tr_api.py` (new)
+- `run.sh` (rewritten with interactive menu)
+- `requirements.txt` (+pytr>=0.4.2)
+- `.env.example` (+TR_PHONE_NO, TR_PIN)
+- `README.md` (updated quickstart)
+- `docs/plans/pytr-phase2-plan.md` (implementation spec)
 
 ---
 
@@ -322,4 +350,5 @@ docker build --build-arg FINNHUB_API_KEY=xxx -t portfolio-prism .
 
 | Date | Change |
 |------|--------|
+| 2025-12-03 | Phase 2 complete: pytr deep integration with run.sh menu |
 | 2025-12-03 | Initial draft based on POC analysis |
