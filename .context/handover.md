@@ -1,48 +1,65 @@
-# Handover: Portfolio Valuation Fix (2025-12-03)
+# Handover: Documentation & MVP Planning (2025-12-03)
 
 ## Status: COMPLETE
 
-Fixed portfolio valuation discrepancy from -27% to -0.2% via ground truth quantity recalculation.
-
-## Where Are We?
-
-- **Validation framework works**: `validate_portfolio.py` correctly identifies discrepancies
-- **GT quantities corrected**: 12 positions had wrong quantities, now fixed via reverse engineering
-- **27/30 positions pass**: Only 3 delisted securities remain as errors (€114 total, 0.3%)
+Restructured README for Trade Republic users and created MVP migration plan.
 
 ## What Was Done
 
-1. **Created `scripts/recalculate_gt.py`**: Reverse-engineers quantities from GT values
-2. **Fixed Vulcan Energy ticker**: `VM3.F` → `VUL.DE` (was €0.10 vs actual €3.18)
-3. **Applied recalculations**: 12 positions updated, timestamped backups created
-4. **Updated learnings**: Phase 18 added to `PROJECT_LEARNINGS.md`
-5. **Added ADR**: Recalculation strategy documented in `DECISION_LOG.md`
+### 1. README Restructure
+- **5-Minute Quickstart** now first section (was buried under architecture)
+- **Trade Republic PDF workflow** - corrected from wrong CSV instructions
+- **API key setup** - Finnhub registration link and .env instructions
+- **Dashboard section** - was completely missing
+- **Simplified Mermaid diagram** - horizontal flow, PDF as input
+- **Troubleshooting** - added PDF-specific issues
+
+### 2. New Documentation
+- `.env.example` - API key template with instructions
+- `docs/plans/MVP-plan.md` - Comprehensive POC→MVP migration plan
+
+### 3. MVP Plan Key Decisions
+- **Input:** Trade Republic PDF only (no CSV alternative)
+- **Deployment:** Docker container with baked API keys
+- **Selenium:** Will be removed, use pre-cached ETF holdings
+- **Target:** Friends & family testing with zero Python setup
 
 ## Key Insight
 
-> **Ground truth values were correct, quantities were wrong.**
-> Formula: `Corrected_Qty = GT_Value / Actual_Price`
-> This pattern is reusable whenever GT capture method is suspect.
+> **The README incorrectly told users to create a CSV file manually.**
+> Trade Republic only exports PDFs. The tool parses PDFs automatically
+> and generates `calculated_holdings.csv` as an intermediate file.
 
-## Remaining Issues
+## Files Changed
 
-| ISIN | Name | Value | Issue |
-|------|------|-------|-------|
-| DE000TKMS000 | TKMS | €61.23 | Delisted |
-| CA87320L1031 | TAAT Global | €29.98 | Delisted |
-| CA22587M1068 | Cresco Labs | €22.85 | Delisted |
-
-## Next Steps
-
-1. User provides fresh Trade Republic export → re-validate to confirm quantities
-2. Decide: Remove delisted securities from GT or manually set values
-3. Consider: Integrate validation into `run_full_pipeline.py`
+| File | Change |
+|------|--------|
+| `README.md` | Complete restructure for TR workflow |
+| `.env.example` | New: API key template |
+| `docs/plans/MVP-plan.md` | New: MVP migration plan |
+| `.context/active_state.md` | Updated |
+| `.context/handover.md` | This file |
 
 ## Quick Commands
 
 ```bash
-python3 scripts/validate_portfolio.py           # Full validation
-python3 scripts/recalculate_gt.py               # Preview recalc
-python3 scripts/recalculate_gt.py --apply       # Apply recalc
-python3 scripts/validate_portfolio.py --debug ISIN  # Debug one
+# Full pipeline (parse PDF + analyze)
+bash run.sh
+
+# Dashboard only
+./run_dashboard.sh
+
+# Validate holdings
+python3 scripts/validate_portfolio.py
 ```
+
+## Next Steps
+
+1. **Techy friend test** - Share repo, gather feedback on README
+2. **Docker container** - Phase 5 of MVP plan
+3. **Pre-cache Amundi** - Remove Selenium dependency
+
+## Open Questions for User
+
+1. Which ETFs do test users own? (need to pre-cache)
+2. Any feedback from techy friend on README clarity?

@@ -42,16 +42,15 @@ FINNHUB_API_KEY=your_api_key_here
 
 ### 5. Prepare Your Portfolio Data
 
-You need a CSV file with your holdings. Create `data/working/calculated_holdings.csv`:
+1. Open **Trade Republic** app
+2. Go to **Profile → Activity → Account Statement** ("Kontoauszug")
+3. Download the PDF (contains all your buy/sell transactions)
+4. Place the PDF in:
+   ```
+   data/inputs/portfolio/
+   ```
 
-```csv
-ISIN,Quantity
-IE00B4L5Y983,50.5
-US67066G1040,10.0
-DE000A0F5UF5,5.25
-```
-
-> **How to get this data:** Export from your broker, or manually list your positions with their ISIN and quantity.
+> **Tip:** You can add multiple PDFs if you have exports from different time periods. The parser will merge them automatically.
 
 ### 6. Run the Pipeline
 ```bash
@@ -59,10 +58,14 @@ bash run.sh
 ```
 
 The pipeline will:
-- Fetch live prices for your holdings
-- Download ETF compositions from providers (iShares, VanEck, Xtrackers, Amundi)
-- Calculate your true exposure to each underlying stock
-- Generate reports in `outputs/`
+1. **Parse your PDF** - Extract all buy/sell transactions from Trade Republic statements
+2. **Calculate holdings** - Sum up quantities per ISIN to get your current positions
+3. **Fetch live prices** - Get current EUR prices from Yahoo Finance
+4. **Decompose ETFs** - Download underlying holdings from iShares, VanEck, Xtrackers, Amundi
+5. **Calculate true exposure** - Aggregate your real exposure to each stock
+6. **Generate reports** - Save results to `outputs/`
+
+> **Incremental mode:** The parser runs in `--mode add_new` by default, only processing new transactions. To reprocess everything from scratch, delete `data/working/calculated_holdings.csv` first.
 
 ### 7. View the Dashboard
 ```bash
@@ -139,10 +142,10 @@ Your answers are saved for future runs.
 ```
 data/
 ├── inputs/
-│   ├── portfolio/          # Your PDF statements (optional)
-│   └── manual_holdings/    # Amundi XLSX files
+│   ├── portfolio/          # Your Trade Republic PDF statements go here
+│   └── manual_holdings/    # Amundi XLSX files (if you own Amundi ETFs)
 └── working/
-    └── calculated_holdings.csv  # Your portfolio (ISIN, Quantity)
+    └── calculated_holdings.csv  # AUTO-GENERATED: Your current positions
 
 config/
 ├── asset_universe.csv      # ISIN ↔ Ticker mappings (auto-populated)
@@ -163,15 +166,19 @@ outputs/
 ```mermaid
 flowchart LR
     subgraph Input["📥 Your Data"]
-        Portfolio["Portfolio CSV<br/>(ISIN, Quantity)"]
+        PDF["Trade Republic<br/>PDF Statement"]
     end
 
-    subgraph Pricing["💹 Live Prices"]
+    subgraph Parse["🔍 Parse"]
+        Parser["Extract Trades"]
+        Holdings["Calculate<br/>Holdings"]
+    end
+
+    subgraph Pricing["💹 Prices"]
         YF["Yahoo Finance"]
     end
 
     subgraph ETF["🔬 ETF Decomposition"]
-        Adapters["Provider Adapters"]
         iShares["iShares"]
         VanEck["VanEck"]
         Xtrackers["Xtrackers"]
@@ -179,34 +186,34 @@ flowchart LR
     end
 
     subgraph Analysis["📊 Analysis"]
-        Aggregate["Aggregate by Stock"]
-        Enrich["Add Metadata"]
+        Aggregate["Aggregate<br/>by Stock"]
     end
 
     subgraph Output["📤 Results"]
-        Report["True Exposure Report"]
-        Dashboard["Interactive Dashboard"]
+        Report["True Exposure<br/>Report"]
+        Dashboard["Dashboard"]
     end
 
-    Portfolio --> YF --> Adapters
-    Adapters --> iShares & VanEck & Xtrackers & Amundi
+    PDF --> Parser --> Holdings --> YF
+    YF --> iShares & VanEck & Xtrackers & Amundi
     iShares & VanEck & Xtrackers & Amundi --> Aggregate
-    Aggregate --> Enrich --> Report & Dashboard
+    Aggregate --> Report & Dashboard
 ```
 
 ### Pipeline Stages
 
 | Stage | What Happens |
 |-------|--------------|
-| **1. Load Portfolio** | Read your ISIN + Quantity from CSV |
-| **2. Fetch Prices** | Get live EUR prices from Yahoo Finance |
-| **3. Identify ETFs** | Separate stocks from ETFs |
-| **4. Decompose ETFs** | Fetch underlying holdings from each provider |
-| **5. Resolve ISINs** | Match holdings to securities database |
-| **6. Aggregate** | Sum direct + indirect exposure per stock |
-| **7. Enrich** | Add sector, geography, company info |
-| **8. Validate** | Check value conservation (±2% tolerance) |
-| **9. Report** | Generate CSV reports and dashboard |
+| **1. Parse PDF** | Extract buy/sell transactions from Trade Republic statements |
+| **2. Calculate Holdings** | Sum quantities per ISIN to get current positions |
+| **3. Fetch Prices** | Get live EUR prices from Yahoo Finance |
+| **4. Identify ETFs** | Separate stocks from ETFs |
+| **5. Decompose ETFs** | Fetch underlying holdings from each provider |
+| **6. Resolve ISINs** | Match holdings to securities database |
+| **7. Aggregate** | Sum direct + indirect exposure per stock |
+| **8. Enrich** | Add sector, geography, company info |
+| **9. Validate** | Check value conservation (±2% tolerance) |
+| **10. Report** | Generate CSV reports and dashboard |
 
 ---
 
@@ -218,6 +225,8 @@ flowchart LR
 |---------|----------|
 | `command not found` | Run `source venv/bin/activate` |
 | `FINNHUB_API_KEY not set` | Create `.env` file with your API key |
+| `No trades found in PDF` | Make sure it's the "Kontoauszug" (Account Statement), not a monthly securities report |
+| `Wrong quantities` | Delete `calculated_holdings.csv` and re-run to reprocess all PDFs |
 | `No price for ISIN` | Check if ticker exists on Yahoo Finance |
 | `Amundi download failed` | Use manual XLSX file (see Configuration) |
 | Dashboard won't start | Check port 8501 is free, or use `--server.port 8502` |
@@ -225,7 +234,7 @@ flowchart LR
 ### Reset Everything
 ```bash
 rm -rf data/working/cache/*
-rm data/working/database/portfolio.db
+rm data/working/calculated_holdings.csv
 bash run.sh
 ```
 

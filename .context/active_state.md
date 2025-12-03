@@ -1,94 +1,82 @@
-# Active State: Portfolio Valuation Fix (Phase 6 Complete)
+# Active State: Documentation & MVP Planning (Phase 7)
 
 ## Status: COMPLETE
 
-Successfully fixed portfolio valuation discrepancy from -27% to -0.2% through ground truth quantity recalculation.
+Restructured README for user-friendly onboarding and created MVP migration plan.
 
 ## Session Summary
 
-### Problem
-- Portfolio calculated value: €30,452
-- Ground truth value: €41,702  
-- Discrepancy: **-27%** (unacceptable)
+### Goals Achieved
+1. Fixed README to reflect actual Trade Republic PDF workflow (not CSV)
+2. Created comprehensive MVP migration plan for Docker deployment
+3. Added missing documentation (.env.example, API key setup)
+4. Simplified architecture diagram for readability
 
-### Root Cause Analysis
-GT data had correct **values** but wrong **quantities** for 12/30 positions. The quantities were systematically understated by 2-5x for major ETF positions.
+### Documentation Updates
 
-### Solution Applied
-**Reverse Engineering Pattern:**
-```
-Corrected_Quantity = GT_Value_EUR / Actual_Price_EUR
-```
+**README.md restructured:**
+- 5-Minute Quickstart now first section
+- Trade Republic PDF workflow (not manual CSV)
+- API key setup with Finnhub registration link
+- Dashboard section added
+- Simplified Mermaid diagram (PDF → Parse → Prices → ETF Decomposition → Dashboard)
+- Troubleshooting table with PDF-specific issues
+- Detailed architecture in collapsible section
 
-Created `scripts/recalculate_gt.py` to:
-1. Fetch historical prices for Nov 24, 2025
-2. Calculate correct quantities from trusted GT values
-3. Apply corrections with automatic backup
+**New files created:**
+- `.env.example` - Template with required/optional API keys
+- `docs/plans/MVP-plan.md` - Comprehensive POC→MVP migration plan
 
-### Results
+### MVP Plan Highlights
 
-| Metric | Before | After |
-|--------|--------|-------|
-| PASS | 8 | **27** |
-| FAIL | 12 | **0** |
-| WARN | 7 | **0** |
-| ERROR | 3 | 3 (delisted) |
-| Discrepancy | -27.0% | **-0.2%** |
+**Target:** Enable friends & family to test with minimal friction
 
-### Key Corrections Applied
+**Key Decisions:**
+1. **Input:** Trade Republic PDF (primary), no CSV alternative
+2. **Deployment:** Docker container (baked API keys, zero Python setup)
+3. **Selenium:** Remove dependency, use pre-cached ETF holdings + manual upload
+4. **API Keys:** Bake Finnhub key into Docker for friends/family testing
 
-| Asset | Original Qty | Corrected Qty |
-|-------|-------------|---------------|
-| IWDA.AS | 59.33 | 119.06 |
-| NQSE.DE | 20.00 | 100.22 |
-| IUSA.MI | 10.00 | 27.58 |
-| GOOGL | 1.85 | 3.92 |
+**Phases:**
+1. Documentation (DONE)
+2. CSV Upload mode in dashboard (future)
+3. Remove Selenium dependency (future)
+4. Docker container (future)
+5. UX polish (future)
 
-### Ticker Fix
-- Vulcan Energy: `VM3.F` → `VUL.DE` (was fetching €0.10 instead of €3.18)
+## Files Modified
 
-## Files Created/Modified
+- `README.md` - Complete restructure for Trade Republic workflow
+- `.context/active_state.md` - This file
+- `.context/handover.md` - Updated handover
 
-### Created
-- `scripts/recalculate_gt.py` - Quantity recalculation utility
+## Files Created
 
-### Modified
-- `data/true_data/ground_truth_validated.csv` - Corrected quantities
-- `config/ticker_map.json` - Fixed Vulcan Energy ticker
-- `PROJECT_LEARNINGS.md` - Added Phase 18 learnings
-- `DECISION_LOG.md` - Added recalculation strategy ADR
+- `.env.example` - API key template
+- `docs/plans/MVP-plan.md` - MVP migration plan
 
-### Backups Created
-- `data/true_data/ground_truth_validated.csv.bak.20251203_*`
-- `data/true_data/ground_truth_recalculated.csv`
+## Pipeline Status
 
-## Remaining Issues
-
-3 positions have no price data (delisted/OTC):
-- TKMS (DE000TKMS000) - €61.23
-- TAAT Global (CA87320L1031) - €29.98  
-- Cresco Labs (CA22587M1068) - €22.85
-
-Total: €114.06 (~0.3% of portfolio) - requires manual verification.
+- Portfolio value: €41,920.09 (correct)
+- 27/30 positions validated
+- 3 delisted securities (€114, 0.3%)
+- Dashboard ready at localhost:8501
 
 ## Commands
 
 ```bash
+# Run pipeline
+bash run.sh
+
+# View dashboard
+./run_dashboard.sh
+
 # Validate portfolio
 python3 scripts/validate_portfolio.py
-
-# Preview recalculation (without applying)
-python3 scripts/recalculate_gt.py
-
-# Apply recalculation
-python3 scripts/recalculate_gt.py --apply
-
-# Debug single position
-python3 scripts/validate_portfolio.py --debug IE00B4L5Y983
 ```
 
 ## Next Steps
 
-1. **Fresh GT Export**: When user provides new Trade Republic export, run validation to confirm quantities
-2. **Delisted Securities**: Either remove from GT or manually set values
-3. **Pipeline Integration**: Consider running validation as part of `run_full_pipeline.py`
+1. **Test with techy friend** - Use current README, gather feedback
+2. **Docker container** - Phase 5 of MVP plan
+3. **Remove Selenium** - Pre-cache Amundi ETFs
