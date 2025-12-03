@@ -1,57 +1,48 @@
-# Handover: Dashboard Fuzzy Search & Test Isolation (2025-12-03)
+# Handover: Portfolio Valuation Fix (2025-12-03)
 
 ## Status: COMPLETE
 
-Completed dashboard UX improvements for Stock Lookup and fixed critical test isolation bug.
+Fixed portfolio valuation discrepancy from -27% to -0.2% via ground truth quantity recalculation.
+
+## Where Are We?
+
+- **Validation framework works**: `validate_portfolio.py` correctly identifies discrepancies
+- **GT quantities corrected**: 12 positions had wrong quantities, now fixed via reverse engineering
+- **27/30 positions pass**: Only 3 delisted securities remain as errors (€114 total, 0.3%)
 
 ## What Was Done
 
-### 1. Dashboard Fuzzy Search Enhancement
-- Replaced dropdown with text input (3-char minimum)
-- Shows matching securities as expandable cards
-- Sort options: Name (A-Z), Total Exposure, Direct %
-- First 3 results expanded, rest collapsed
-- Maximum 20 results with "refine search" message
+1. **Created `scripts/recalculate_gt.py`**: Reverse-engineers quantities from GT values
+2. **Fixed Vulcan Energy ticker**: `VM3.F` → `VUL.DE` (was €0.10 vs actual €3.18)
+3. **Applied recalculations**: 12 positions updated, timestamped backups created
+4. **Updated learnings**: Phase 18 added to `PROJECT_LEARNINGS.md`
+5. **Added ADR**: Recalculation strategy documented in `DECISION_LOG.md`
 
-### 2. Stock Lookup Duplicate Bug Fix
-- **Problem**: Alphabet showed 6 times with different name variants
-- **Root Cause**: Dashboard grouped by `name` instead of `ISIN`
-- **Fix**: Group by ISIN, use canonical name from `asset_universe.csv`
-- Added `get_isin_name_mapping()` helper to `src/dashboard/utils.py`
-- Removed duplicate ISIN (`US02079K1079`) from `asset_universe.csv`
-- Added duplicate detection warning in `AssetUniverse.load()`
+## Key Insight
 
-### 3. Test Isolation Fix
-- **Problem**: Running `pytest` overwrote `outputs/holdings_breakdown.csv` with test data
-- **Root Cause**: Hardcoded path in `run_aggregation()`
-- **Fix**: 
-  - Added `HOLDINGS_BREAKDOWN_PATH` to `src/config.py`
-  - Updated `src/core/aggregation/__init__.py` to use config path
-  - Patched both test files to write to temp directories
+> **Ground truth values were correct, quantities were wrong.**
+> Formula: `Corrected_Qty = GT_Value / Actual_Price`
+> This pattern is reusable whenever GT capture method is suspect.
 
-## Commits
-- `003cf75` feat(dashboard): add fuzzy search for stock lookup, fix test isolation
+## Remaining Issues
 
-## Test Status
-- All 47 tests passing
-- Production breakdown file (4376 lines) preserved after test runs
-
-## Files Modified
-- `src/config.py` - Added `HOLDINGS_BREAKDOWN_PATH`
-- `src/core/aggregation/__init__.py` - Use config path
-- `src/dashboard/tabs/holdings_analysis.py` - Fuzzy search rewrite
-- `src/dashboard/utils.py` - Added `get_isin_name_mapping()`
-- `src/data/resolution.py` - Duplicate ISIN warning
-- `config/asset_universe.csv` - Removed duplicate
-- `tests/test_aggregation.py` - Temp directory patch
-- `tests/test_integration.py` - Temp directory patch
-
-## Launch
-```bash
-./run_dashboard.sh
-pytest  # Safe - won't corrupt production data
-```
+| ISIN | Name | Value | Issue |
+|------|------|-------|-------|
+| DE000TKMS000 | TKMS | €61.23 | Delisted |
+| CA87320L1031 | TAAT Global | €29.98 | Delisted |
+| CA22587M1068 | Cresco Labs | €22.85 | Delisted |
 
 ## Next Steps
-- Consider adding more output paths to config (e.g., `TRUE_EXPOSURE_REPORT` already there)
-- Backlog item added for CI check on output file protection
+
+1. User provides fresh Trade Republic export → re-validate to confirm quantities
+2. Decide: Remove delisted securities from GT or manually set values
+3. Consider: Integrate validation into `run_full_pipeline.py`
+
+## Quick Commands
+
+```bash
+python3 scripts/validate_portfolio.py           # Full validation
+python3 scripts/recalculate_gt.py               # Preview recalc
+python3 scripts/recalculate_gt.py --apply       # Apply recalc
+python3 scripts/validate_portfolio.py --debug ISIN  # Debug one
+```

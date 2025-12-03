@@ -131,3 +131,33 @@ The `enrichment.py` module was fetching data from the Finnhub API. However, for 
 **Decision:** Implement an "Auto-Harvesting" mechanism that runs at the end of the pipeline.
 **Rationale:** Successfully resolved ISINs are automatically promoted from the temporary cache to the permanent `asset_universe.csv`. This turns the system into a self-learning engine: the more it runs, the faster and more robust it becomes, with zero manual effort.
 *   **Stability:** Fixes the Nvidia overvaluation bug permanently.
+
+---
+
+## 2025-12-03: Ground Truth Quantity Recalculation Strategy
+
+### Context
+Portfolio validation showed -27% discrepancy between calculated values and ground truth (GT). Investigation revealed the GT **values** (EUR amounts) were correct (from Trade Republic app display), but **quantities** were systematically wrong for 12/30 positions—some by 100-400%. Root cause: unknown data capture method that corrupted quantities while preserving values.
+
+### Decision
+**Reverse-Engineering Approach:** Instead of discarding GT or waiting for a fresh export, use the trusted GT values to recalculate correct quantities:
+
+```
+Corrected_Quantity = GT_Value_EUR / Actual_Price_EUR_on_Reference_Date
+```
+
+**Implementation:**
+1. Created `scripts/recalculate_gt.py` with preview and apply modes
+2. Fetches historical prices for reference date (2025-11-24) via yfinance
+3. Handles currency conversion (USD→EUR, GBP→EUR, HKD→EUR)
+4. Creates timestamped backups before modifying GT
+5. Updates quantities only when change exceeds 2% threshold
+
+### Consequences
+*   **Accuracy:** Reduced portfolio discrepancy from -27% to -0.2% (114 EUR on 41k portfolio)
+*   **Transparency:** Each recalculation is logged with before/after values in GT Notes field
+*   **Reusability:** Script can be re-run whenever GT needs correction
+*   **Trade-off:** Assumes GT values are authoritative (reasonable for broker-displayed amounts)
+
+### Ticker Mapping Fix (Related)
+Discovered Vulcan Energy ticker `VM3.F` was wrong (€0.10 price vs actual €3.18). Fixed to `VUL.DE`. **Lesson:** Extreme recalculation changes (>500%) indicate ticker mapping errors, not quantity errors.

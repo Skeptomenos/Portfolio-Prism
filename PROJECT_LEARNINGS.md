@@ -121,3 +121,11 @@
 - **Centralized Paths:** Hardcoded paths like `"outputs/file.csv"` are non-configurable and fragile. **Rule:** Centralize all output paths in `src/config.py`.
 - **Patch Location:** When patching constants, patch where they're **used**, not where they're **defined** (e.g., `@patch("src.core.aggregation.HOLDINGS_BREAKDOWN_PATH")` not `@patch("src.config.HOLDINGS_BREAKDOWN_PATH")`).
 - **Incremental Verification:** After any pipeline run, verify key outputs (row counts, sample data) to catch corruption early.
+
+### Phase 18: Portfolio Valuation & Ground Truth Correction (2025-12-03)
+- **Ground Truth Data Quality:** User-provided ground truth (GT) may contain systematic errors. The GT "values" were correct but "quantities" were wrong for 12/30 positions (some off by 400%!). **Rule:** Never assume GT is authoritative without validation. Cross-check GT quantities against: `Quantity = Value / (Price × FX_Rate)`.
+- **Reverse Engineering Pattern:** When GT values are trusted but quantities are suspect, use the formula `Recalculated_Qty = GT_Value_EUR / Actual_Price_EUR` to reverse-engineer correct quantities. This is especially useful when the original data capture method is unknown.
+- **Ticker Mapping Vigilance:** Wrong ticker mappings cause silent, massive errors. Vulcan Energy (`VM3.F` → `VUL.DE`) was fetching €0.10 instead of €3.18, causing 3000% recalculation error. **Rule:** When a recalculated change exceeds 500%, suspect ticker mapping first.
+- **Validation-Driven Development:** Build validation scripts BEFORE fixing data. The `validate_portfolio.py` script identified exactly which positions failed, enabling targeted fixes. **Pattern:** Observe → Measure → Fix → Re-measure.
+- **Backup Before Overwrite:** The `recalculate_gt.py` script creates timestamped backups before modifying GT files. **Rule:** Any script that modifies source-of-truth files must create backups automatically.
+- **Delisted Securities:** Some securities (TKMS, TAAT, Cresco Labs) return no price data from yfinance. These are likely delisted or OTC. **Rule:** Flag these as "MANUAL_REQUIRED" rather than silently setting to zero.
