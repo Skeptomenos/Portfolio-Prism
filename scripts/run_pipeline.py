@@ -15,7 +15,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.data.state_manager import load_portfolio_state
 from src.core.aggregation import run_aggregation
 from src.core.reporting import generate_report
-from src.data.market import get_price_map
+
+# Note: We use TR prices from pytr instead of yfinance for portfolio valuation.
+# get_price_map from market.py is only used for historical charts, not main pipeline.
 from src.core.validation import validate_final_report
 from src.utils.logging_config import get_logger
 from src.adapters.registry import AdapterRegistry, AdapterNotImplementedError
@@ -25,10 +27,24 @@ from pandera import errors as pa_errors
 from datetime import datetime
 from src.utils.metrics import tracker
 from src.core.health import health
-from src.data.enrichment import load_asset_universe
+
+# Note: load_asset_universe from enrichment returns {ticker: isin} which excludes
+# ISINs without Yahoo_Ticker. For health checks, we load the CSV directly.
 from src.data.holdings_cache import HoldingsCache, ManualUploadRequired
+from src.core.enrichment_gaps import EnrichmentGapCollector
 
 logger = get_logger(__name__)
+
+# Global gap collector instance - will be set in run_pipeline()
+_gap_collector: EnrichmentGapCollector = None
+
+
+def get_gap_collector() -> EnrichmentGapCollector:
+    """Get the current gap collector instance."""
+    global _gap_collector
+    if _gap_collector is None:
+        _gap_collector = EnrichmentGapCollector()
+    return _gap_collector
 
 
 def generate_quality_report(failed_etfs: list, output_path: str):
@@ -94,17 +110,16 @@ def run_pipeline():
     health.record_metric("etf_positions", len(etf_positions), "set")
 
     # Check Unmapped Direct Holdings
+    # Note: We load the CSV directly instead of using load_asset_universe() from enrichment,
+    # because that function returns {ticker: isin} and excludes ISINs without Yahoo_Ticker.
+    # Auto-added ISINs from Trade Republic often don't have Yahoo_Ticker yet.
     try:
-        universe_mapping = load_asset_universe()
-        # asset_universe keys are usually Tickers or ISINs?
-        # load_asset_universe returns {ticker: isin} or {isin: metadata}?
-        # Actually it returns {ticker: isin}.
-        # But direct_positions has 'isin'.
-        # We should check if the ISIN exists in the universe values?
-        # Or if the TICKER exists in the keys?
-        # Direct positions usually have ISIN.
-        # Let's check if ISIN is known.
-        known_isins = set(universe_mapping.values())
+        universe_path = "config/asset_universe.csv"
+        if os.path.exists(universe_path):
+            universe_df = pd.read_csv(universe_path)
+            known_isins = set(universe_df["ISIN"].dropna())
+        else:
+            known_isins = set()
 
         for _, row in direct_positions.iterrows():
             isin = row.get("isin")
@@ -124,29 +139,34 @@ def run_pipeline():
     holdings_cache = HoldingsCache()
 
     # --- Phase 2.5 (Market Data) ---
-    # Combine to fetch prices for ALL assets (Stocks + ETFs)
+    # Use Trade Republic prices from pytr (already loaded via state_manager)
+    # No need to fetch from yfinance - TR provides real-time prices
     all_positions = pd.concat([direct_positions, etf_positions], ignore_index=True)
 
     if not all_positions.empty:
-        logger.info("--- Updating All Positions with Live Prices (yfinance) ---")
-        all_isins = all_positions["isin"].tolist()
-        live_prices = get_price_map(all_isins)
+        logger.info("--- Using Trade Republic Prices for Portfolio Valuation ---")
 
         for index, row in all_positions.iterrows():
             isin = row["isin"]
-            if isin in live_prices:
-                new_price = live_prices[isin]
+            tr_price = row.get("tr_price")
+
+            # Use TR price if available (from pytr's NetValue/Quantity)
+            if tr_price is not None and pd.notna(tr_price) and float(tr_price) > 0:
                 quantity = row["quantity"]
-                # Update price and market value
-                all_positions.at[index, "current_price"] = new_price
-                all_positions.at[index, "market_value"] = quantity * new_price
-                logger.debug(f"  - Updated {isin}: €{new_price:.2f}")
+                all_positions.at[index, "current_price"] = float(tr_price)
+                all_positions.at[index, "market_value"] = quantity * float(tr_price)
+                logger.debug(f"  - {isin}: €{float(tr_price):.2f} (from TR)")
             else:
-                price_val = row["current_price"]
-                price_str = f"€{price_val:.2f}" if price_val is not None else "N/A"
-                logger.warning(
-                    f"  - ⚠️ No live price for {isin}. Using database value: {price_str}"
-                )
+                # Fallback: check if current_price already set
+                current = row.get("current_price")
+                if current is not None and pd.notna(current) and float(current) > 0:
+                    quantity = row["quantity"]
+                    all_positions.at[index, "market_value"] = quantity * float(current)
+                    logger.debug(f"  - {isin}: €{float(current):.2f} (existing)")
+                else:
+                    logger.warning(
+                        f"  - ⚠️ No price for {isin}. Market value may be inaccurate."
+                    )
 
     # --- Phase 2.6 (Direct Reporting) ---
     generate_direct_holdings_report(all_positions)
@@ -157,6 +177,13 @@ def run_pipeline():
 
     # --- Phase 3 (Aggregation) ---
     logger.info("--- Running Phase 3: Aggregation ---")
+
+    # Initialize and set gap collector for enrichment
+    from src.core.aggregation.enrichment import set_gap_collector
+
+    gap_collector = get_gap_collector()
+    set_gap_collector(gap_collector)
+
     etf_holdings_map = {}
     failed_etfs = []  # Now stores tuples of (isin, reason)
 
@@ -335,6 +362,16 @@ def run_pipeline():
 
     # --- Final Step: Data Quality Report ---
     generate_quality_report(failed_etfs, "outputs/data_quality_report.txt")
+
+    # Save enrichment gaps for dashboard
+    gap_collector = get_gap_collector()
+    gap_collector.save()
+    summary = gap_collector.get_summary()
+    if summary.total_gaps > 0:
+        logger.info(
+            f"--- Enrichment Gaps: {summary.total_gaps} items "
+            f"({summary.total_weight_affected:.2f}% of portfolio) ---"
+        )
 
     tracker.save("outputs/pipeline_metrics.json")
 

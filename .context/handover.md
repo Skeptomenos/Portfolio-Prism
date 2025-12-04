@@ -1,56 +1,63 @@
-# Handover: Beta Tester ISIN Fix Complete (2025-12-04)
+# Handover: Graceful Enrichment Failure System - COMPLETE
 
-## Status: COMPLETE (v0.2.2)
+**Date:** 2025-12-05 | **Status:** Complete
 
-Fixed 14 missing ISINs reported by beta tester. Migrated Selenium to Playwright. Created Vanguard adapter.
+## Summary
+
+Implemented a complete graceful degradation system for ISIN resolution failures, including dashboard UI for manual enrichment.
 
 ## What Was Done
 
-### Beta Tester ISIN Fix
-1. **13 ETF ISINs Added**: 9 iShares (with product IDs), 2 Xtrackers, 1 Vanguard
-2. **2 Assets Added**: Impinj (US7223041028), WisdomTree ETC (IE00BF4TWC33 - marked ignore)
-3. **Vanguard Adapter Created**: New `src/adapters/vanguard.py` with Playwright + BeautifulSoup
+### New Files Created
+| File | Purpose |
+|------|---------|
+| `src/core/enrichment_gaps.py` | EnrichmentGap dataclass + collector |
+| `src/data/manual_enrichments.py` | Load/save user ISIN mappings |
+| `config/suggested_isins.json` | 36 pre-populated ISINs (Asian/biotech) |
+| `src/dashboard/tabs/missing_data.py` | Dashboard tab with editable form |
 
-### Selenium → Playwright Migration
-1. **Removed**: `selenium`, `selenium-wire` dependencies
-2. **Added**: `playwright` dependency
-3. **Created**: `src/utils/browser.py` (shared browser utilities)
-4. **Refactored**: `src/adapters/amundi.py` for Playwright
-5. **Created**: `scripts/test_adapter.py` for adapter testing
-
-## Known Limitations
-
-| Adapter | Issue | Workaround |
-|---------|-------|------------|
-| Vanguard | Only gets top 10 holdings (25% weight) | Manual CSV upload |
-| Amundi | Playwright selectors broken | Manual XLSX upload (works) |
-
-## Files Changed
-
+### Files Modified
 | File | Change |
 |------|--------|
-| `config/adapter_registry.json` | +13 ISINs |
-| `config/ishares_config.json` | +9 product IDs |
-| `config/asset_universe.csv` | +2 assets |
-| `src/adapters/vanguard.py` | Created |
-| `src/adapters/amundi.py` | Playwright refactor |
-| `src/utils/browser.py` | Created |
-| `scripts/test_adapter.py` | Created |
-| `pyproject.toml` | -selenium, +playwright |
-| `requirements.txt` | -selenium, +playwright |
-| `QUICKSTART.md` | Added playwright install step |
+| `scripts/run_pipeline.py` | Gap collector integration, TR prices, health check fix |
+| `src/data/resolution.py` | Check manual_enrichments first in resolve() |
+| `src/core/aggregation/enrichment.py` | Record gaps, pass ETF context |
+| `src/core/aggregation/__init__.py` | Calculate ETF portfolio weight |
+| `src/dashboard/app.py` | Add "Missing Data" tab |
+| `pyproject.toml` | Added pydantic, streamlit, plotly, matplotlib, pytr |
 
-## Next Steps
+## Architecture
 
-1. **Fix Amundi Selectors**: Debug screenshot at `data/working/raw_downloads/debug_screenshots/amundi_FR0010361683_error.png`
-2. **Vanguard Full Holdings**: Investigate API endpoints captured in logs, or implement "View All" button
-3. **Beta Tester Retest**: Have friend `git pull` and confirm errors resolved
-
-## Quick Commands
-
-```bash
-python scripts/test_adapter.py IE00B4L5Y983   # Test iShares
-python scripts/test_adapter.py IE00BK5BQT80   # Test Vanguard
-python scripts/test_adapter.py --list         # List all adapters
-pytest                                         # 47 tests passing
 ```
+Pipeline Run
+    │
+    └── EnrichmentGapCollector
+            ├── Records gaps during ETF enrichment
+            └── Saves to outputs/enrichment_gaps.json
+
+Dashboard (Missing Data Tab)
+    │
+    ├── Shows coverage %, gap count, weight affected
+    ├── Pre-fills suggestions from config/suggested_isins.json
+    └── Saves to config/manual_enrichments.json
+
+Next Pipeline Run
+    │
+    └── Resolution checks manual_enrichments.json FIRST
+```
+
+## Key Decisions
+
+1. **TR prices only** - Portfolio valuation uses Trade Republic prices, not yfinance
+2. **Format-only ISIN validation** - Dashboard checks 12-char format, not database
+3. **Manual first** - Resolution checks user mappings before any API calls
+
+## Tests
+
+86 tests passing (1 error is false positive - `scripts/test_adapter.py` is a CLI tool, not a pytest test)
+
+## Next Steps (Future)
+
+1. Add more suggested ISINs as patterns emerge from beta testers
+2. Consider auto-detecting common ticker patterns (e.g., `.HK` suffix for HK stocks)
+3. Build ISIN lookup helper (query OpenFIGI/Wikidata from dashboard)

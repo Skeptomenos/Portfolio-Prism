@@ -33,6 +33,7 @@ import requests
 from src.config import ASSET_UNIVERSE_PATH
 from src.utils.isin_validator import is_valid_isin, is_placeholder_isin
 from src.utils.logging_config import get_logger
+from src.data.manual_enrichments import load_manual_enrichments
 
 logger = get_logger(__name__)
 
@@ -281,6 +282,20 @@ class ISINResolver:
             )
             self._record_resolution(ticker_clean, name_clean, result)
             return result
+
+        # 1b. Manual enrichments (user-provided ISINs)
+        manual_mappings = load_manual_enrichments()
+        if ticker_clean.upper() in manual_mappings:
+            manual_isin = manual_mappings[ticker_clean.upper()]
+            if is_valid_isin(manual_isin):
+                result = ResolutionResult(
+                    isin=manual_isin,
+                    status="resolved",
+                    detail="manual",
+                    source="manual",
+                )
+                self._record_resolution(ticker_clean, name_clean, result)
+                return result
 
         # 2. Universe lookup by ticker
         universe_isin = self.universe.lookup_by_ticker(ticker_clean)

@@ -24,6 +24,11 @@ dependencies = [
     "pytest",
     "pandera",
     "cryptography",  # Required by pdfplumber
+    "pydantic",      # Data validation models
+    "streamlit",     # Dashboard UI
+    "plotly",        # Interactive charts
+    "matplotlib",    # Static charts (visualize_portfolio.py)
+    "pytr",          # Trade Republic API
 ]
 
 [project.scripts]

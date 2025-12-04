@@ -1,69 +1,66 @@
-# Active State: Vanguard US API Integration - COMPLETE
+# Active State: Graceful Enrichment Failure System - COMPLETE
 
-**Objective:** Full Vanguard holdings via US API | **Status:** COMPLETE | **Date:** 2025-12-04
+**Objective:** Dashboard UI for manual ISIN enrichment | **Status:** COMPLETE | **Date:** 2025-12-05
 
 ## Summary
 
-Implemented Vanguard US API integration to fetch complete ETF holdings with ISINs. European Vanguard ETFs now get full holdings data by mapping to their US equivalents.
+Completed implementation of graceful enrichment failure system with dashboard UI for beta tester (Philipp) issues.
 
-## Completed This Session
+## Completed
 
 | Task | Status |
 |------|--------|
-| Discovered Vanguard US API endpoint | ✅ Complete |
-| Added VANGUARD_US_EQUIVALENTS mapping | ✅ Complete |
-| Implemented `_fetch_via_us_api()` with pagination | ✅ Complete |
-| Fixed pagination params (start/count vs offset/limit) | ✅ Complete |
-| All 86 tests pass | ✅ Verified |
-
-## API Details
-
-**Endpoint:**
-```
-https://investor.vanguard.com/investment-products/etfs/profile/api/{FUND_ID}/portfolio-holding/stock
-```
-
-**Parameters:**
-- `start`: 1-based start index
-- `count`: Number of records (max 500)
-- `sortColumn`: `percentWeight`
-- `sortOrder`: `desc`
-
-**Response fields:**
-- `size`: Total holdings count
-- `fund.entity[]`: Holdings array with ticker, isin, weight, etc.
-
-## ISIN Mappings Added
-
-| European ISIN | US Ticker | US Fund ID | Index |
-|---------------|-----------|------------|-------|
-| IE00BK5BQT80 (VWCE) | VT | 3141 | FTSE All-World |
-| IE00B3RBWM25 (VWRL) | VT | 3141 | FTSE All-World |
-| IE00BKX55T58 (VEVE) | VXUS | 3369 | FTSE Developed ex-US |
-
-## Test Results (VWCE / IE00BK5BQT80)
-
-- **Holdings fetched:** 9,936 (via 20 API calls)
-- **Unique holdings:** 2,059 (after filtering)
-- **Total weight:** 91.78% (stocks only - bonds/cash in other endpoints)
-- **ISINs present:** 2,058/2,059
-- **Tickers present:** 2,001/2,059
-
-## Strategy Order
-
-1. Manual file (CSV/XLSX in `data/inputs/manual_holdings/`)
-2. **US Vanguard API** (complete holdings with ISINs) ← NEW
-3. Playwright (German site fallback)
-4. BeautifulSoup (top 10 only, last resort)
+| EnrichmentGap dataclass + collector | ✅ Complete |
+| Manual enrichments load/save | ✅ Complete |
+| Suggested ISINs (36 entries) | ✅ Complete |
+| Dashboard "Missing Data" tab | ✅ Complete |
+| Pipeline gap collection integration | ✅ Complete |
+| Resolution chain: manual first | ✅ Complete |
+| TR prices for portfolio valuation | ✅ Complete |
+| Health check fix (load CSV directly) | ✅ Complete |
+| All 86 tests passing | ✅ Verified |
 
 ## Files Changed
 
+### New Files
+| File | Purpose |
+|------|---------|
+| `src/core/enrichment_gaps.py` | Gap tracking dataclass + collector |
+| `src/data/manual_enrichments.py` | Persistent user ISIN mappings |
+| `config/suggested_isins.json` | 36 pre-populated ISINs |
+| `src/dashboard/tabs/missing_data.py` | Dashboard UI |
+
+### Modified Files
 | File | Change |
 |------|--------|
-| `src/adapters/vanguard.py` | Added US API integration with pagination |
+| `scripts/run_pipeline.py` | Gap collector, TR prices, health check fix |
+| `src/data/resolution.py` | Check manual_enrichments first |
+| `src/core/aggregation/enrichment.py` | Record gaps with ETF context |
+| `src/core/aggregation/__init__.py` | Calculate ETF portfolio weight |
+| `src/dashboard/app.py` | Add Missing Data tab |
+| `pyproject.toml` | Added pydantic, streamlit, plotly, matplotlib, pytr |
+
+## Architecture
+
+```
+Pipeline → EnrichmentGapCollector → outputs/enrichment_gaps.json
+                                          ↓
+Dashboard (Missing Data tab) ← loads gaps
+                                          ↓
+User enters ISINs → config/manual_enrichments.json
+                                          ↓
+Next Pipeline Run → Resolution checks manual first
+```
+
+## Key Decisions
+
+1. TR prices only for portfolio valuation (no yfinance)
+2. Format-only ISIN validation (12 chars)
+3. Manual enrichments checked FIRST in resolution chain
+4. Pre-filled suggestions for common failing tickers
 
 ## Next Steps (Future)
 
-1. Add more ISIN mappings for other Vanguard ETFs (VUAA, VUSA, etc.)
-2. Consider fetching bonds endpoint for fixed income ETFs
-3. Beta tester feedback integration
+- Add more suggested ISINs as patterns emerge
+- Auto-detect ticker patterns (e.g., `.HK` suffix)
+- Build ISIN lookup helper in dashboard

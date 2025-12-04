@@ -13,6 +13,7 @@ from src.dashboard.tabs import (
     portfolio_xray,
     performance,
     etf_overlap,
+    missing_data,
 )
 
 st.set_page_config(
@@ -25,7 +26,7 @@ st.set_page_config(
 st.title("📊 Portfolio Analysis System")
 
 # Tabs - Performance first as it's the primary user interest
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
         "📈 Performance",
         "🔍 Portfolio X-Ray",
@@ -33,6 +34,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         "📦 Holdings Analysis",
         "🛠️ Data Manager",
         "🏥 Pipeline Health",
+        "❓ Missing Data",
     ]
 )
 
@@ -53,3 +55,6 @@ with tab5:
 
 with tab6:
     pipeline_health.render()
+
+with tab7:
+    missing_data.render()

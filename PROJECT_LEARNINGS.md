@@ -165,3 +165,10 @@
 - **Network Interception:** Playwright's `page.on("response")` captures API calls during navigation. Useful for discovering hidden JSON endpoints. Even if APIs don't return full data, they reveal structure for future work.
 - **Shared Browser Utilities:** Extract common patterns (cookie consent, downloads, screenshots) into `src/utils/browser.py`. Reduces duplication across adapters. Context manager pattern (`with BrowserContext()`) ensures cleanup.
 - **Ignore Strategy:** For synthetic products (commodity ETCs like WisdomTree Industrial Metals), mark as "ignore" in adapter registry rather than failing. These products don't have traditional holdings to decompose.
+
+### Phase 23: Graceful Enrichment Failure System (2025-12-04)
+- **Graceful Degradation Pattern:** When external API resolution fails, provide: (1) Gap collection during processing, (2) Dashboard visibility with priority scoring, (3) Pre-filled suggestions to reduce user effort, (4) Persistent manual overrides checked FIRST in resolution chain.
+- **TR Prices over Yahoo:** Trade Republic provides real-time prices via pytr (`netValue/quantity`). Using these for portfolio valuation eliminates yfinance dependency failures that caused €0.00 totals for beta testers.
+- **Health Check Data Source:** When checking "known ISINs", load `asset_universe.csv` directly instead of using `load_asset_universe()` which filters out ISINs without Yahoo_Ticker. Auto-added ISINs from TR often lack tickers initially.
+- **Manual Enrichment First:** In resolution chain, check `config/manual_enrichments.json` BEFORE external APIs. User-provided ISINs are authoritative and skip expensive API calls.
+- **Suggested ISINs:** Pre-populate common failing tickers (Asian stocks like 9988.HK, biotech like REGN) in `config/suggested_isins.json`. Reduces manual research burden for users.

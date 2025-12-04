@@ -201,3 +201,47 @@ Beta tester encountered 14 missing ISIN errors. Investigation revealed several g
 ### Trade-offs Accepted
 - **Vanguard Partial Data:** Accepting top 10 holdings (~25% weight) for now. Full holdings require either API discovery or manual CSV upload. This unblocks beta testers immediately.
 - **Amundi Manual Fallback:** Playwright automation broken for current Amundi website. Manual file upload works perfectly. Will fix selectors in future iteration.
+
+---
+
+## 2025-12-04: Graceful Enrichment Failure System
+
+### Context
+Beta tester (Philipp) encountered 16 tickers failing ISIN resolution (REGN, AZN, 9988.HK, etc.) and €0.00 total portfolio value. The system had no visibility into what was failing or why, and no way to manually fix gaps without editing CSV files.
+
+### Decision
+**Graceful Degradation with Dashboard UI:** Instead of failing silently, the system now:
+1. **Collects gaps** during enrichment with context (ticker, name, source ETF, weight, failure reason)
+2. **Persists gaps** to `outputs/enrichment_gaps.json` for dashboard consumption
+3. **Provides UI** via new "Missing Data" tab with editable ISIN inputs
+4. **Pre-fills suggestions** from `config/suggested_isins.json` for common failing tickers
+5. **Saves manual mappings** to `config/manual_enrichments.json`
+6. **Checks manual first** in resolution chain, before any API calls
+
+### Implementation
+| File | Purpose |
+|------|---------|
+| `src/core/enrichment_gaps.py` | EnrichmentGap dataclass + EnrichmentGapCollector |
+| `src/data/manual_enrichments.py` | Load/save user ISIN mappings |
+| `config/suggested_isins.json` | 36 pre-populated ISINs for common failures |
+| `src/dashboard/tabs/missing_data.py` | Dashboard tab with metrics + editable table |
+
+### Rationale
+- **User Empowerment:** Users can fix gaps themselves without developer intervention
+- **Visibility:** Dashboard shows exactly what's failing and its portfolio impact
+- **Efficiency:** Manual ISINs are checked first, skipping expensive API calls
+- **Progressive Enhancement:** Pre-filled suggestions reduce research burden
+
+### Consequences
+**Positive:**
+- Beta testers can unblock themselves by adding ISINs via UI
+- Gap visibility enables prioritization (high-weight gaps first)
+- Manual enrichments persist across pipeline runs
+
+**Negative:**
+- Adds complexity (3 new files + 1 tab)
+- Users must re-run pipeline after adding enrichments
+
+### Trade-offs Accepted
+- **Format-only ISIN validation:** Dashboard validates ISIN format (12 chars) but not database existence. Invalid ISINs will simply fail resolution on next run.
+- **TR prices only:** Portfolio valuation now uses Trade Republic prices exclusively, not yfinance. This eliminates €0.00 totals but limits price updates to TR's refresh rate.

@@ -18,7 +18,7 @@ from src.utils.logging_config import get_logger
 
 from .classification import classify_etf_holdings
 from .direct import process_direct_holdings
-from .enrichment import enrich_etf_holdings, reset_resolver
+from .enrichment import enrich_etf_holdings, reset_resolver, set_gap_collector
 from .grouping import aggregate_indirect_holdings, calculate_indirect_values
 from .output import finalize_and_save
 
@@ -80,13 +80,26 @@ def run_aggregation(
 
     all_holdings = pd.DataFrame()
 
+    # Calculate total portfolio value for weight calculations
+    total_portfolio_value = etf_positions["market_value"].sum() + (
+        direct_positions["market_value"].sum() if not direct_positions.empty else 0
+    )
+
     if not etf_positions.empty:
         for etf in etf_positions.to_dict("records"):
             etf_isin = etf["isin"]
+            etf_name = etf["name"]
             etf_market_value = etf["market_value"]
 
+            # Calculate ETF weight in portfolio
+            etf_portfolio_weight = (
+                (etf_market_value / total_portfolio_value * 100)
+                if total_portfolio_value > 0
+                else 0.0
+            )
+
             logger.info(
-                f"  - Processing ETF: {etf['name']} "
+                f"  - Processing ETF: {etf_name} "
                 f"(ISIN: {etf_isin}, Value: €{etf_market_value:,.2f})"
             )
 
@@ -99,7 +112,13 @@ def run_aggregation(
             # Process: Classify -> Enrich -> Calculate values
             holdings = holdings.copy()
             holdings = classify_etf_holdings(holdings)
-            holdings = enrich_etf_holdings(holdings, etf_market_value)
+            holdings = enrich_etf_holdings(
+                holdings,
+                etf_market_value,
+                etf_isin=etf_isin,
+                etf_name=etf_name,
+                etf_portfolio_weight=etf_portfolio_weight,
+            )
             holdings = calculate_indirect_values(holdings, etf_market_value)
 
             # Add Parent Info for Lineage/Drill-down
