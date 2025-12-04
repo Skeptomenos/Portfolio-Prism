@@ -17,6 +17,7 @@ dependencies = [
     "pytr>=0.4.2",           # Trade Republic API
     "selenium",
     "selenium-wire",
+    "blinker==1.7.0",        # Pin for selenium-wire compatibility (1.8+ breaks it)
     "webdriver-manager",
     "requests",
     "beautifulsoup4",
