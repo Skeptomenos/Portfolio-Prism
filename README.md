@@ -247,7 +247,7 @@ flowchart TB
 |---------|----------|
 | `command not found` | Run `source venv/bin/activate` |
 | `FINNHUB_API_KEY not set` | Create `.env` file with your API key |
-| `pytr not found` | Run `pip install pytr` |
+| `ModuleNotFoundError` | Run `pip install -e .` to install all dependencies |
 | `pytr authentication failed` | Run `python scripts/fetch_tr_api.py --reconfigure` to update credentials |
 | `No trades found in PDF` | Make sure it's the "Kontoauszug" (Account Statement), not a monthly securities report |
 | `Wrong quantities` | Delete `calculated_holdings.csv` and re-run to reprocess all PDFs |
