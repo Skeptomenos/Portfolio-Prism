@@ -24,6 +24,10 @@ dependencies = [
     "pytest",
     "pandera",
     "cryptography",  # Required by pdfplumber
+    "pytr>=0.4.2",  # Trade Republic API
+    "pydantic>=2.0",  # Data models
+    "streamlit>=1.30",  # Dashboard
+    "plotly>=5.18",  # Dashboard charts
 ]
 
 [tool.setuptools.packages.find]
