@@ -166,15 +166,27 @@ def render_securities_list(overlap_data: dict):
 
     with col1:
         total_overlapping = len(multi_df)
-        st.metric("Overlapping Securities", total_overlapping)
+        st.metric(
+            "Overlapping Securities",
+            total_overlapping,
+            help="Number of individual securities that appear in more than one of your ETFs. Higher overlap means more hidden concentration.",
+        )
 
     with col2:
         total_overlap_value = multi_df["total_value"].sum()
-        st.metric("Total Overlap Value", f"EUR {total_overlap_value:,.2f}")
+        st.metric(
+            "Total Overlap Value",
+            f"EUR {total_overlap_value:,.2f}",
+            help="Combined value of all securities that appear in multiple ETFs. This represents your duplicated exposure.",
+        )
 
     with col3:
         max_overlap = multi_df["etf_count"].max() if not multi_df.empty else 0
-        st.metric("Max ETF Overlap", f"{max_overlap} ETFs")
+        st.metric(
+            "Max ETF Overlap",
+            f"{max_overlap} ETFs",
+            help="The highest number of ETFs that share a single security. A stock appearing in many ETFs creates hidden concentration.",
+        )
 
     # Bar chart of top overlapping securities
     top_n = 10
@@ -217,6 +229,50 @@ def render_securities_list(overlap_data: dict):
         )
 
 
+def render_overlap_insights_section(overlap_data: dict, direct_df: pd.DataFrame):
+    """Render educational insights about ETF overlap."""
+    from src.dashboard.insights import generate_overlap_insights
+
+    multi_df = overlap_data.get("multi_etf_securities")
+    if multi_df is None or multi_df.empty:
+        return
+
+    # Calculate values for insights
+    overlap_count = len(multi_df)
+    overlap_value = multi_df["total_value"].sum()
+    total_value = direct_df["market_value"].sum() if not direct_df.empty else 0
+    max_etf_count = int(multi_df["etf_count"].max()) if not multi_df.empty else 0
+
+    # Build top overlapping list
+    top_overlapping = []
+    for _, row in multi_df.head(3).iterrows():
+        top_overlapping.append(
+            (str(row["name"]), int(row["etf_count"]), float(row["total_value"]))
+        )
+
+    # Generate insights
+    insights = generate_overlap_insights(
+        overlap_count=overlap_count,
+        overlap_value=overlap_value,
+        total_value=total_value,
+        max_etf_count=max_etf_count,
+        top_overlapping=top_overlapping,
+    )
+
+    # Render insights
+    if insights:
+        with st.expander("ETF Overlap Insights", expanded=True):
+            for obs in insights:
+                if obs.level == "success":
+                    st.success(obs.text)
+                elif obs.level == "warning":
+                    st.warning(obs.text)
+                elif obs.level == "error":
+                    st.error(obs.text)
+                else:
+                    st.info(obs.text)
+
+
 def render_hidden_concentration(overlap_data: dict, breakdown_df: pd.DataFrame):
     """Render hidden concentration alerts."""
     st.subheader("Hidden Concentration Alerts")
@@ -245,6 +301,11 @@ def render():
     """Main render function for ETF Overlap tab."""
     st.header("ETF Overlap Analysis")
 
+    st.caption(
+        "Discover hidden duplication across your ETFs. The same stock might appear in multiple funds, "
+        "concentrating your risk without you realizing it. Overlap is measured using Jaccard similarity."
+    )
+
     # Load data
     breakdown_df = load_holdings_breakdown()
     direct_df = load_direct_holdings()
@@ -270,6 +331,11 @@ def render():
     if not overlap_data:
         st.error("Could not calculate overlap data.")
         return
+
+    # Render overlap insights
+    render_overlap_insights_section(overlap_data, direct_df)
+
+    st.divider()
 
     # Render components
     render_hidden_concentration(overlap_data, etf_breakdown)

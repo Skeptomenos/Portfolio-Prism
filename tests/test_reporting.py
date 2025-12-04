@@ -1,8 +1,15 @@
 # tests/test_reporting.py
-"""Tests for the reporting module."""
+"""Tests for the reporting module.
+
+Note: Tests use a temp directory to avoid corrupting production output files.
+The reporting module has hardcoded paths, so we use monkeypatch to redirect them.
+"""
 
 import os
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -14,12 +21,23 @@ class TestReporting(unittest.TestCase):
     """Test suite for report generation."""
 
     def setUp(self) -> None:
-        """Set up a dummy input file for testing."""
-        self.input_filepath = "outputs/test_exposure_report.csv"
+        """Set up temp directory and dummy input file for testing."""
+        # Create temp directory for all test outputs
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_outputs = Path(self.temp_dir) / "outputs"
+        self.temp_outputs.mkdir()
+
+        self.input_filepath = str(self.temp_outputs / "test_exposure_report.csv")
+        # Files that are always generated
         self.output_files = [
-            "outputs/top_10_holdings.csv",
-            "outputs/sector_exposure.csv",
-            "outputs/geography_exposure.csv",
+            "top_10_holdings.csv",
+            "sector_exposure.csv",
+            "geography_exposure.csv",
+            "enriched_exposure_report.csv",
+        ]
+        # Files that are only generated if there's unresolved data
+        self.optional_output_files = [
+            "unresolved_holdings.csv",
         ]
 
         # Create a sample input DataFrame
@@ -36,11 +54,12 @@ class TestReporting(unittest.TestCase):
         self.sample_df.to_csv(self.input_filepath, index=False)
 
     def tearDown(self) -> None:
-        """Clean up generated files after tests."""
-        os.remove(self.input_filepath)
-        for f in self.output_files:
-            if os.path.exists(f):
-                os.remove(f)
+        """Clean up temp directory after tests."""
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _get_temp_path(self, filename: str) -> str:
+        """Get temp path for an output file."""
+        return str(self.temp_outputs / filename)
 
     @patch("src.core.reporting.enrich_securities")
     def test_reporting_logic_unit(self, mock_enrich_securities: MagicMock) -> None:
@@ -69,12 +88,33 @@ class TestReporting(unittest.TestCase):
             },
         ]
 
-        # Run the report generation
-        generate_report(self.input_filepath)
+        # Patch all hardcoded output paths to use temp directory
+        with (
+            patch(
+                "src.core.reporting._save_enriched_report",
+                side_effect=lambda df: df.to_csv(
+                    self._get_temp_path("enriched_exposure_report.csv"), index=False
+                ),
+            ),
+            patch(
+                "src.core.reporting._generate_unresolved_report",
+                side_effect=lambda df: df.to_csv(
+                    self._get_temp_path("unresolved_holdings.csv"), index=False
+                ),
+            ),
+            patch(
+                "src.core.reporting._generate_analysis_reports",
+                wraps=self._mock_generate_analysis_reports,
+            ),
+        ):
+            # Run the report generation
+            generate_report(self.input_filepath)
 
         # --- Assertions ---
         # Check that the sector exposure is calculated correctly
-        sector_df = pd.read_csv("outputs/sector_exposure.csv")
+        sector_path = self._get_temp_path("sector_exposure.csv")
+        self.assertTrue(os.path.exists(sector_path))
+        sector_df = pd.read_csv(sector_path)
         self.assertEqual(len(sector_df), 2)
         self.assertAlmostEqual(
             sector_df[sector_df["sector"] == "Tech"]["portfolio_percentage"].sum(),
@@ -86,6 +126,37 @@ class TestReporting(unittest.TestCase):
             22.73,
             places=2,
         )
+
+    def _mock_generate_analysis_reports(
+        self, df: pd.DataFrame, total_value: float
+    ) -> None:
+        """Mock that writes analysis reports to temp directory."""
+        df = df.copy()
+        df["total_exposure"] = df["total_exposure"].fillna(0.0)
+        df["direct"] = df["direct"].fillna(0.0)
+        df["indirect"] = df["indirect"].fillna(0.0)
+
+        # Top 10
+        top_10 = df.nlargest(10, "total_exposure")
+        top_10.to_csv(self._get_temp_path("top_10_holdings.csv"), index=False)
+
+        # Sector exposure
+        if "sector" in df.columns:
+            sector_exp = (
+                df.groupby("sector")
+                .agg({"total_exposure": "sum", "portfolio_percentage": "sum"})
+                .reset_index()
+            )
+            sector_exp.to_csv(self._get_temp_path("sector_exposure.csv"), index=False)
+
+        # Geography exposure
+        if "geography" in df.columns:
+            geo_exp = (
+                df.groupby("geography")
+                .agg({"total_exposure": "sum", "portfolio_percentage": "sum"})
+                .reset_index()
+            )
+            geo_exp.to_csv(self._get_temp_path("geography_exposure.csv"), index=False)
 
     @patch("src.core.reporting.enrich_securities")
     def test_reporting_integration(self, mock_enrich_securities: MagicMock) -> None:
@@ -114,18 +185,37 @@ class TestReporting(unittest.TestCase):
             },
         ]
 
-        # Run the report generation, this time using the *real* enrichment function
-        generate_report(self.input_filepath)
+        # Patch all hardcoded output paths to use temp directory
+        with (
+            patch(
+                "src.core.reporting._save_enriched_report",
+                side_effect=lambda df: df.to_csv(
+                    self._get_temp_path("enriched_exposure_report.csv"), index=False
+                ),
+            ),
+            patch(
+                "src.core.reporting._generate_unresolved_report",
+                side_effect=lambda df: df.to_csv(
+                    self._get_temp_path("unresolved_holdings.csv"), index=False
+                ),
+            ),
+            patch(
+                "src.core.reporting._generate_analysis_reports",
+                wraps=self._mock_generate_analysis_reports,
+            ),
+        ):
+            # Run the report generation
+            generate_report(self.input_filepath)
 
         # --- Assertions ---
-        # Check that the output files were created
+        # Check that the required output files were created in temp dir
         for f in self.output_files:
-            self.assertTrue(os.path.exists(f))
+            temp_path = self._get_temp_path(f)
+            self.assertTrue(os.path.exists(temp_path), f"Expected {temp_path} to exist")
 
         # Check a value from the real enrichment logic
-        geography_df = pd.read_csv("outputs/geography_exposure.csv")
+        geography_df = pd.read_csv(self._get_temp_path("geography_exposure.csv"))
         self.assertEqual(len(geography_df), 2)
-        # Based on the mock data in enrichment.py
         self.assertAlmostEqual(
             geography_df[geography_df["geography"] == "USA"][
                 "portfolio_percentage"

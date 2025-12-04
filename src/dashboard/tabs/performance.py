@@ -106,10 +106,18 @@ def render_summary_metrics(df: pd.DataFrame):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric(label="Total Portfolio Value", value=f"EUR {total_value:,.2f}")
+        st.metric(
+            label="Total Portfolio Value",
+            value=f"EUR {total_value:,.2f}",
+            help="Current market value of all your holdings (stocks + ETFs) based on latest prices.",
+        )
 
     with col2:
-        st.metric(label="Total Cost Basis", value=f"EUR {total_cost:,.2f}")
+        st.metric(
+            label="Total Cost Basis",
+            value=f"EUR {total_cost:,.2f}",
+            help="Total amount you invested across all positions. This is your average purchase price × quantity for each holding.",
+        )
 
     with col3:
         pl_color = "normal" if total_pl >= 0 else "inverse"
@@ -118,6 +126,7 @@ def render_summary_metrics(df: pd.DataFrame):
             value=f"EUR {total_pl:+,.2f}",
             delta=f"{total_pl_pct:+.2f}%",
             delta_color=pl_color,
+            help="Unrealized Profit/Loss: The gain or loss you would realize if you sold all positions today. Green = profit, Red = loss.",
         )
 
 
@@ -233,17 +242,57 @@ def render_winners_losers(df: pd.DataFrame):
             "Winners",
             f"{winners_count} positions",
             f"{winners_count / total_count * 100:.0f}%",
+            help="Positions with positive returns (current value > cost basis). A higher winner ratio generally indicates good stock selection.",
         )
     with col2:
         st.metric(
             "Losers",
             f"{losers_count} positions",
             f"{losers_count / total_count * 100:.0f}%",
+            help="Positions with negative returns (current value < cost basis). Some losers are normal in any portfolio.",
         )
     with col3:
         best_pct = df["pl_percent"].max()
         worst_pct = df["pl_percent"].min()
-        st.metric("Range", f"{worst_pct:+.1f}% to {best_pct:+.1f}%")
+        st.metric(
+            "Range",
+            f"{worst_pct:+.1f}% to {best_pct:+.1f}%",
+            help="The spread between your worst and best performing positions. A wide range indicates high dispersion in returns.",
+        )
+
+
+def render_portfolio_insights(df: pd.DataFrame):
+    """Render portfolio health summary with insights."""
+    from src.dashboard.insights import (
+        generate_portfolio_summary,
+        generate_performance_insights,
+    )
+
+    summary = generate_portfolio_summary(df)
+    if summary is None:
+        return
+
+    # Headline in an info box
+    if summary.total_pl >= 0:
+        st.success(f"**{summary.headline}**")
+    else:
+        st.error(f"**{summary.headline}**")
+
+    # Key observations
+    insights = generate_performance_insights(df)
+    all_observations = summary.observations + insights
+
+    if all_observations:
+        with st.expander("Portfolio Insights", expanded=True):
+            for obs in all_observations:
+                if obs.level == "success":
+                    st.success(obs.text)
+                elif obs.level == "warning":
+                    st.warning(obs.text)
+                elif obs.level == "error":
+                    st.error(obs.text)
+                else:
+                    st.info(obs.text)
 
 
 def render_positions_table(df: pd.DataFrame):
@@ -317,6 +366,11 @@ def render():
     """Main render function for Performance tab."""
     st.header("Performance Analytics")
 
+    st.caption(
+        "Track your unrealized gains and losses. See which positions are working "
+        "for you and which need attention. Data is based on your average purchase price from Trade Republic."
+    )
+
     # Auto-snapshot on load (if >24h old)
     from src.dashboard.utils import save_snapshot_if_needed
 
@@ -341,6 +395,9 @@ def render():
 
     # Render components
     render_summary_metrics(df)
+
+    # Portfolio Health Summary
+    render_portfolio_insights(df)
 
     st.divider()
 

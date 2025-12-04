@@ -122,6 +122,12 @@
 - **Patch Location:** When patching constants, patch where they're **used**, not where they're **defined** (e.g., `@patch("src.core.aggregation.HOLDINGS_BREAKDOWN_PATH")` not `@patch("src.config.HOLDINGS_BREAKDOWN_PATH")`).
 - **Incremental Verification:** After any pipeline run, verify key outputs (row counts, sample data) to catch corruption early.
 
+### Phase 17b: Test Pollution Deep Dive (2025-12-04)
+- **Partial Patch = Silent Corruption:** Patched `HOLDINGS_BREAKDOWN_PATH` but not `TRUE_EXPOSURE_REPORT` → mock data overwrote production. **Rule:** Patch ALL output paths or patch NONE.
+- **Hardcoded Path = Untestable:** `"outputs/file.csv"` in function body → can't redirect in tests. **Fix:** Parameterize or import from config.
+- **Symptom: "Tests Pass, Data Wrong":** Row count drops (1793→4), dashboard broken, tests green → test pollution. Check file mtime vs test runtime.
+- **Verification Command:** `wc -l outputs/*.csv && head -3 outputs/true_exposure_report.csv` after pytest. Catches corruption immediately.
+
 ### Phase 18: Portfolio Valuation & Ground Truth Correction (2025-12-03)
 - **Ground Truth Data Quality:** User-provided ground truth (GT) may contain systematic errors. The GT "values" were correct but "quantities" were wrong for 12/30 positions (some off by 400%!). **Rule:** Never assume GT is authoritative without validation. Cross-check GT quantities against: `Quantity = Value / (Price × FX_Rate)`.
 - **Reverse Engineering Pattern:** When GT values are trusted but quantities are suspect, use the formula `Recalculated_Qty = GT_Value_EUR / Actual_Price_EUR` to reverse-engineer correct quantities. This is especially useful when the original data capture method is unknown.

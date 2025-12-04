@@ -37,6 +37,11 @@ def get_concentration_rating(hhi: float) -> tuple[str, str]:
 def render():
     st.header("📊 Portfolio X-Ray")
 
+    st.caption(
+        "Understand your true exposure after looking through ETF wrappers. "
+        "Monitor concentration risk and see how your investments are allocated across asset types."
+    )
+
     # Load Data
     direct_df = load_direct_holdings()
     exposure_df = load_exposure_report()
@@ -54,9 +59,21 @@ def render():
     num_positions = len(direct_df)
     unique_assets = len(exposure_df) if not exposure_df.empty else num_positions
 
-    col1.metric("Total Portfolio Value", f"EUR {total_value:,.2f}")
-    col2.metric("Direct Positions", num_positions)
-    col3.metric("Unique Underlying Assets", unique_assets)
+    col1.metric(
+        "Total Portfolio Value",
+        f"EUR {total_value:,.2f}",
+        help="Current market value of all your direct holdings (stocks + ETFs) based on latest prices.",
+    )
+    col2.metric(
+        "Direct Positions",
+        num_positions,
+        help="Number of individual securities you hold directly in your portfolio (each stock or ETF counts as one position).",
+    )
+    col3.metric(
+        "Unique Underlying Assets",
+        unique_assets,
+        help="Total unique securities after looking through ETFs. This reveals how many different companies you're actually invested in.",
+    )
 
     st.divider()
 
@@ -106,6 +123,7 @@ def render():
             value=f"{hhi:.4f}",
             delta=hhi_rating,
             delta_color=hhi_color,
+            help="Herfindahl-Hirschman Index measures portfolio concentration. <0.01 = highly diversified, 0.01-0.015 = diversified, 0.015-0.025 = moderate, >0.025 = concentrated.",
         )
 
     with col2:
@@ -113,6 +131,7 @@ def render():
             label="Top 5 Concentration",
             value=f"{top_5_concentration:.1f}%",
             delta="of total exposure",
+            help="Combined weight of your 5 largest positions. Above 50% means half your portfolio is in just 5 holdings.",
         )
 
     with col3:
@@ -120,6 +139,7 @@ def render():
             label="Top 10 Concentration",
             value=f"{top_10_concentration:.1f}%",
             delta="of total exposure",
+            help="Combined weight of your 10 largest positions. This shows how top-heavy your portfolio is.",
         )
 
     with col4:
@@ -130,6 +150,41 @@ def render():
             value=f"{max_single:.1f}%",
             delta=single_stock_warning,
             delta_color=single_color,
+            help="Weight of your single largest holding. Positions above 15% create significant single-stock risk - a large price drop would heavily impact your portfolio.",
+        )
+
+    # Color-coded concentration interpretation
+    if hhi < 0.01:
+        st.success(
+            "**Well Diversified:** Your portfolio is spread across many positions, "
+            "reducing the impact of any single holding on overall performance."
+        )
+    elif hhi < 0.015:
+        st.success(
+            "**Diversified:** Your portfolio has good diversification. "
+            "Risk is reasonably distributed across your holdings."
+        )
+    elif hhi < 0.025:
+        st.warning(
+            "**Moderate Concentration:** A few positions dominate your portfolio. "
+            "Consider whether this aligns with your risk tolerance."
+        )
+    else:
+        st.error(
+            "**High Concentration:** Your portfolio is heavily weighted in few positions. "
+            "A significant drop in one holding would materially impact your portfolio value."
+        )
+
+    # Single stock risk alert
+    if max_single > 20:
+        st.error(
+            f"**Single-Stock Alert:** One position represents {max_single:.1f}% of your portfolio. "
+            "This level of concentration creates significant idiosyncratic risk."
+        )
+    elif max_single > 15:
+        st.warning(
+            f"**Note:** Your largest position ({max_single:.1f}%) exceeds the 15% threshold "
+            "often used as a guideline for single-stock concentration."
         )
 
     # Direct vs Indirect pie chart

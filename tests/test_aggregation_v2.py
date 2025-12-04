@@ -7,7 +7,10 @@ This test suite verifies:
 """
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -214,7 +217,21 @@ class TestOutputModule(unittest.TestCase):
 class TestAggregationIntegration(unittest.TestCase):
     """
     Integration test for the aggregation module end-to-end.
+
+    Note: Tests patch output paths to avoid corrupting production files.
     """
+
+    def setUp(self) -> None:
+        """Create temp directory for test outputs."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.temp_exposure_path = Path(self.temp_dir) / "test_true_exposure.csv"
+        self.temp_breakdown_path = Path(self.temp_dir) / "test_breakdown.csv"
+
+    def tearDown(self) -> None:
+        """Cleanup temp files."""
+        import shutil
+
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_run_aggregation_overlapping_holdings(self) -> None:
         """
@@ -224,6 +241,7 @@ class TestAggregationIntegration(unittest.TestCase):
         This is a regression test for the core aggregation logic.
         Updated to use valid ISINs for the new resolution architecture.
         """
+        # Import first (module is already loaded, patches apply at runtime)
         from src.core.aggregation import run_aggregation
 
         # Test data with valid ISINs
@@ -266,8 +284,17 @@ class TestAggregationIntegration(unittest.TestCase):
             "IE00B53SZB19": holdings2,
         }
 
-        # Run aggregation
-        result_df = run_aggregation(direct_positions, etf_positions, etf_holdings_map)
+        # Patch paths at the module level to avoid corrupting production outputs
+        with (
+            patch("src.core.aggregation.TRUE_EXPOSURE_REPORT", self.temp_exposure_path),
+            patch(
+                "src.core.aggregation.HOLDINGS_BREAKDOWN_PATH", self.temp_breakdown_path
+            ),
+        ):
+            # Run aggregation inside patch context
+            result_df = run_aggregation(
+                direct_positions, etf_positions, etf_holdings_map
+            )
 
         # Check Apple values (US0378331005)
         aapl_row = result_df[result_df["isin"] == "US0378331005"]

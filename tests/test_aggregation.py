@@ -8,12 +8,14 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from src.config import TRUE_EXPOSURE_REPORT
 from src.core.aggregation import run_aggregation
 
 
 class TestAggregation(unittest.TestCase):
-    """Test suite for aggregation logic."""
+    """Test suite for aggregation logic.
+
+    Note: Tests use temp directories to avoid corrupting production output files.
+    """
 
     def test_aggregation_with_overlapping_indirect_holdings(self) -> None:
         """
@@ -26,8 +28,12 @@ class TestAggregation(unittest.TestCase):
         # Use temp directory to avoid polluting production data
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_breakdown = Path(tmpdir) / "holdings_breakdown.csv"
+            tmp_exposure = Path(tmpdir) / "true_exposure_report.csv"
 
-            with patch("src.core.aggregation.HOLDINGS_BREAKDOWN_PATH", tmp_breakdown):
+            with (
+                patch("src.core.aggregation.HOLDINGS_BREAKDOWN_PATH", tmp_breakdown),
+                patch("src.core.aggregation.TRUE_EXPOSURE_REPORT", tmp_exposure),
+            ):
                 # 1. Define Input DataFrames with valid ISINs
                 # US0378331005 = Apple Inc (valid ISIN)
                 # US5949181045 = Microsoft Corp (valid ISIN)
@@ -71,17 +77,15 @@ class TestAggregation(unittest.TestCase):
                     "IE00B53SZB19": holdings2,
                 }
 
-                # 2. Run the aggregation logic
-                output_file = str(TRUE_EXPOSURE_REPORT)
-                if os.path.exists(output_file):
-                    os.remove(output_file)
-
+                # 2. Run the aggregation logic (writes to temp file)
                 run_aggregation(direct_positions, etf_positions, etf_holdings_map)
 
+                # 3. Verify output file was created and read it
+                output_file = str(tmp_exposure)
                 self.assertTrue(os.path.exists(output_file))
                 actual_df = pd.read_csv(output_file)
 
-                # 3. Define Expected Outcome and Assert
+                # 4. Define Expected Outcome and Assert
                 aapl_row = actual_df[actual_df["isin"] == "US0378331005"]
                 self.assertFalse(aapl_row.empty)
 

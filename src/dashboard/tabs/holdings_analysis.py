@@ -35,13 +35,25 @@ def render_etf_explorer(direct_df: pd.DataFrame, breakdown_df: pd.DataFrame):
 
     # Summary Stats
     col1, col2, col3 = st.columns(3)
-    col1.metric("Holdings Count", len(holdings))
-    col2.metric("Total Value in Portfolio", f"€{holdings['value_eur'].sum():,.2f}")
+    col1.metric(
+        "Holdings Count",
+        len(holdings),
+        help="Number of individual securities held within this ETF.",
+    )
+    col2.metric(
+        "Total Value in Portfolio",
+        f"€{holdings['value_eur'].sum():,.2f}",
+        help="Your proportional share of this ETF's underlying holdings based on your investment amount.",
+    )
 
     # Safe mode extraction
     sector_mode = holdings["sector"].mode()
     top_sector = sector_mode[0] if len(sector_mode) > 0 else "N/A"
-    col3.metric("Top Sector", top_sector)
+    col3.metric(
+        "Top Sector",
+        top_sector,
+        help="The most common sector among this ETF's holdings. This indicates the ETF's primary focus.",
+    )
 
     # Table
     st.dataframe(
@@ -137,16 +149,22 @@ def render_security_card(
     with st.expander(header, expanded=expanded):
         # Summary metrics row
         c1, c2, c3 = st.columns(3)
-        c1.metric("Total Exposure", f"€{total_val:,.2f}")
+        c1.metric(
+            "Total Exposure",
+            f"€{total_val:,.2f}",
+            help="Your combined exposure to this security from all sources (direct holdings + ETF holdings).",
+        )
         c2.metric(
             "Direct",
             f"€{direct_val:,.2f}",
             delta=f"{direct_val / total_val:.0%}" if total_val > 0 else "0%",
+            help="Value of this security held directly in your portfolio (not through ETFs).",
         )
         c3.metric(
             "Via ETFs",
             f"€{indirect_val:,.2f}",
             delta=f"{indirect_val / total_val:.0%}" if total_val > 0 else "0%",
+            help="Value of this security held indirectly through your ETFs. This is your 'hidden' exposure.",
         )
 
         # Sources table
@@ -287,6 +305,11 @@ def render_stock_lookup(direct_df: pd.DataFrame, breakdown_df: pd.DataFrame):
 
 def render():
     st.header("Holdings Analysis")
+
+    st.caption(
+        "Drill into individual ETFs to see their underlying holdings, or search for any stock "
+        "to see your total exposure from all sources (direct + via ETFs)."
+    )
 
     # Load Data
     direct_df = load_direct_holdings()
