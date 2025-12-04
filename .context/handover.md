@@ -1,39 +1,56 @@
-# Handover: Dashboard Analytics Enhancement Complete (2025-12-04)
+# Handover: Beta Tester ISIN Fix Complete (2025-12-04)
 
-## Status: COMPLETE (v0.2.1)
+## Status: COMPLETE (v0.2.2)
 
-Dashboard enhanced with 4 new features: Performance P/L tab, ETF Overlap analysis, Concentration metrics, and automated snapshots.
+Fixed 14 missing ISINs reported by beta tester. Migrated Selenium to Playwright. Created Vanguard adapter.
 
 ## What Was Done
 
-### Dashboard Analytics Enhancement
-1. **Performance Tab (NEW)**: P/L analytics with unrealized gains/losses, winners/losers visualization. Uses AvgCost from pytr.
-2. **ETF Overlap Tab (NEW)**: Overlap matrix heatmap (Jaccard similarity), securities in multiple ETFs, hidden concentration alerts.
-3. **Concentration Risk (Enhanced)**: HHI calculation, top 5/10 concentration %, single-stock alerts (>15% warning) in Portfolio X-Ray.
-4. **Automated Snapshots**: Daily JSON snapshots in `data/working/snapshots/` for historical tracking.
+### Beta Tester ISIN Fix
+1. **13 ETF ISINs Added**: 9 iShares (with product IDs), 2 Xtrackers, 1 Vanguard
+2. **2 Assets Added**: Impinj (US7223041028), WisdomTree ETC (IE00BF4TWC33 - marked ignore)
+3. **Vanguard Adapter Created**: New `src/adapters/vanguard.py` with Playwright + BeautifulSoup
+
+### Selenium → Playwright Migration
+1. **Removed**: `selenium`, `selenium-wire` dependencies
+2. **Added**: `playwright` dependency
+3. **Created**: `src/utils/browser.py` (shared browser utilities)
+4. **Refactored**: `src/adapters/amundi.py` for Playwright
+5. **Created**: `scripts/test_adapter.py` for adapter testing
+
+## Known Limitations
+
+| Adapter | Issue | Workaround |
+|---------|-------|------------|
+| Vanguard | Only gets top 10 holdings (25% weight) | Manual CSV upload |
+| Amundi | Playwright selectors broken | Manual XLSX upload (works) |
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/dashboard/tabs/performance.py` | **Created** - P/L analytics tab |
-| `src/dashboard/tabs/etf_overlap.py` | **Created** - ETF overlap analysis tab |
-| `src/dashboard/tabs/portfolio_xray.py` | **Enhanced** - Added concentration metrics |
-| `src/dashboard/utils.py` | **Enhanced** - Added snapshot functions |
-| `src/dashboard/app.py` | **Modified** - Added new tabs (6 total) |
-| `README.md` | **Updated** - Dashboard Features section |
-| `CHANGELOG.md` | **Updated** - v0.2.1 release notes |
+| `config/adapter_registry.json` | +13 ISINs |
+| `config/ishares_config.json` | +9 product IDs |
+| `config/asset_universe.csv` | +2 assets |
+| `src/adapters/vanguard.py` | Created |
+| `src/adapters/amundi.py` | Playwright refactor |
+| `src/utils/browser.py` | Created |
+| `scripts/test_adapter.py` | Created |
+| `pyproject.toml` | -selenium, +playwright |
+| `requirements.txt` | -selenium, +playwright |
+| `QUICKSTART.md` | Added playwright install step |
 
 ## Next Steps
 
-1. **Test Dashboard**: Run `./run_dashboard.sh` to verify all 6 tabs render correctly
-2. **Historical Charts**: Build time-series visualizations once snapshot data accumulates (7+ days)
-3. **MVP Phase 3-6**: Remove Selenium, Docker container, UX polish
+1. **Fix Amundi Selectors**: Debug screenshot at `data/working/raw_downloads/debug_screenshots/amundi_FR0010361683_error.png`
+2. **Vanguard Full Holdings**: Investigate API endpoints captured in logs, or implement "View All" button
+3. **Beta Tester Retest**: Have friend `git pull` and confirm errors resolved
 
 ## Quick Commands
 
 ```bash
-./run_dashboard.sh   # View dashboard with new tabs
-pytest               # 47 tests passing
-bash run.sh          # Run pipeline (API or PDF)
+python scripts/test_adapter.py IE00B4L5Y983   # Test iShares
+python scripts/test_adapter.py IE00BK5BQT80   # Test Vanguard
+python scripts/test_adapter.py --list         # List all adapters
+pytest                                         # 47 tests passing
 ```

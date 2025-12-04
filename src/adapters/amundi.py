@@ -1,15 +1,17 @@
+# src/adapters/amundi.py
+"""
+Amundi ETF Adapter
+
+Fetches holdings data from Amundi's ETF website using Playwright.
+Supports manual file fallback for offline/cached data.
+"""
+
 import sys
-import time
 import os
 import pandas as pd
 from typing import Optional
-from seleniumwire import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 try:
-    # Monkeypatch pandas to support 'calamine' engine if installed
     from python_calamine.pandas import pandas_monkeypatch
 
     pandas_monkeypatch()
@@ -19,11 +21,20 @@ except ImportError:
 
 from src.utils.logging_config import get_logger
 from src.config import MANUAL_INPUTS_DIR, RAW_DOWNLOADS_DIR
+from src.data.holdings_cache import ManualUploadRequired
 
 logger = get_logger(__name__)
 
 
 class AmundiAdapter:
+    """
+    Adapter for fetching ETF holdings data from Amundi.
+
+    Strategy:
+    1. Try manual file first (CSV/XLSX in manual_inputs directory)
+    2. Fallback to Playwright browser automation
+    """
+
     def fetch_holdings(self, isin: str) -> pd.DataFrame:
         """
         Navigates the Amundi website to download the holdings XLSX file.
@@ -36,9 +47,21 @@ class AmundiAdapter:
         if df is not None:
             return df
 
-        # 2. Fallback to Automation
-        logger.info("  - ℹ️ No manual file found. Proceeding to automated download...")
-        return self._fetch_via_selenium(isin)
+        # 2. Docker mode: manual files only (no browser)
+        if os.getenv("DOCKER_MODE") == "true":
+            download_url = (
+                f"https://www.amundietf.de/de/privatanleger/products/equity/{isin}"
+            )
+            raise ManualUploadRequired(
+                isin=isin,
+                provider="Amundi",
+                message=f"Amundi ETFs require manual upload in Docker mode. Download from: {download_url}",
+                download_url=download_url,
+            )
+
+        # 3. Fallback to Automation
+        logger.info("  - No manual file found. Proceeding to automated download...")
+        return self._fetch_via_playwright(isin)
 
     def _fetch_from_manual_file(self, isin: str) -> Optional[pd.DataFrame]:
         """Attempts to load and parse a manually placed file."""
@@ -50,12 +73,12 @@ class AmundiAdapter:
 
         # A. Try XLSX
         if os.path.exists(xlsx_path):
-            logger.info(f"  - ✅ Found manual file: {xlsx_path}")
+            logger.info(f"  - Found manual file: {xlsx_path}")
             df = self._read_manual_xlsx(xlsx_path)
 
         # B. Try CSV
         if df is None and os.path.exists(csv_path):
-            logger.info(f"  - ✅ Found manual file: {csv_path}")
+            logger.info(f"  - Found manual file: {csv_path}")
             df = self._read_manual_csv(csv_path)
 
         # C. Process Dataframe
@@ -82,21 +105,18 @@ class AmundiAdapter:
                 else:
                     raise e_default
 
-            header_row_idx = None
-            for i, row in temp_df.iterrows():
+            header_row_idx: int = 0
+            for idx in range(len(temp_df)):
+                row = temp_df.iloc[idx]
                 row_str = row.astype(str).str.lower().tolist()
                 if "isin" in row_str and "name" in row_str:
-                    header_row_idx = i
+                    header_row_idx = idx
                     break
 
             engine = "calamine" if CALAMINE_AVAILABLE else None
 
-            if header_row_idx is not None:
-                logger.info(f"    - Detected header at row {header_row_idx}")
-                return pd.read_excel(path, header=header_row_idx, engine=engine)
-            else:
-                logger.warning("    - Could not detect header row. Trying header=0.")
-                return pd.read_excel(path, header=0, engine=engine)
+            logger.info(f"    - Detected header at row {header_row_idx}")
+            return pd.read_excel(path, header=header_row_idx, engine=engine)
 
         except Exception as e:
             logger.error(f"    - Failed to read manual XLSX: {e}")
@@ -142,10 +162,14 @@ class AmundiAdapter:
 
         # 2. Clean Data
         initial_len = len(df)
-        df = df.dropna(subset=["name", "weight_percentage"])
-        df = df[df["isin"].astype(str).str.len() > 5]
-        df = df[~df["name"].astype(str).str.contains("Total", case=False, na=False)]
-        df = df[~df["name"].astype(str).str.contains("Assets", case=False, na=False)]
+        df = pd.DataFrame(df.dropna(subset=["name", "weight_percentage"]))
+        df = pd.DataFrame(df[df["isin"].astype(str).str.len() > 5])
+        df = pd.DataFrame(
+            df[~df["name"].astype(str).str.contains("Total", case=False, na=False)]
+        )
+        df = pd.DataFrame(
+            df[~df["name"].astype(str).str.contains("Assets", case=False, na=False)]
+        )
 
         if len(df) < initial_len:
             logger.info(f"    - Dropped {initial_len - len(df)} footer/invalid rows.")
@@ -179,15 +203,6 @@ class AmundiAdapter:
             if col not in df.columns:
                 df[col] = None
 
-        # Debug AstraZeneca
-        astra_row = df[
-            df["name"].astype(str).str.contains("ASTRA", case=False, na=False)
-        ]
-        if not astra_row.empty:
-            logger.info(
-                f"    - DEBUG: AstraZeneca found. Weight: {astra_row['weight_percentage'].values}"
-            )
-
         cols_to_return = [
             "ticker",
             "isin",
@@ -198,123 +213,173 @@ class AmundiAdapter:
             "currency",
         ]
         logger.info(f"    - Successfully parsed manual file with {len(df)} rows.")
-        return df[cols_to_return]
+        return pd.DataFrame(df[cols_to_return])
 
-    def _fetch_via_selenium(self, isin: str) -> pd.DataFrame:
-        """Executes the Selenium automation to download the file."""
-        driver = None
-        OUTPUT_DIR = RAW_DOWNLOADS_DIR
-        DOWNLOAD_KEYWORD = ".xlsx"
-        target_url = f"https://www.amundietf.de/de/privatanleger/products/equity/amundi-msci-india-swap-ucits-etf-eur-acc/{isin}"
+    def _fetch_via_playwright(self, isin: str) -> pd.DataFrame:
+        """Executes Playwright automation to download the holdings file."""
+        try:
+            from src.utils.browser import (
+                BrowserContext,
+                handle_cookie_consent,
+                wait_for_download,
+                save_debug_screenshot,
+                PlaywrightNotInstalledError,
+            )
+        except ImportError as e:
+            logger.error(f"Failed to import browser utilities: {e}")
+            return pd.DataFrame()
+
+        # Build the target URL
+        target_url = self._build_amundi_url(isin)
 
         try:
-            # Configure Driver
-            download_dir = os.path.abspath(OUTPUT_DIR)
-            options = webdriver.ChromeOptions()
-            options.add_argument("--headless")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            prefs = {
-                "download.default_directory": download_dir,
-                "download.prompt_for_download": False,
-                "download.directory_upgrade": True,
-                "safebrowsing.enabled": True,
-            }
-            options.add_experimental_option("prefs", prefs)
+            with BrowserContext(headless=True) as ctx:
+                page = ctx.new_page()
 
-            driver = webdriver.Chrome(options=options)
-            driver.command_executor._commands["send_command"] = (
-                "POST",
-                "/session/$sessionId/chromium/send_command",
-            )
-            params = {
-                "cmd": "Page.setDownloadBehavior",
-                "params": {"behavior": "allow", "downloadPath": download_dir},
-            }
-            driver.execute("send_command", params)
+                # Navigate to product page
+                logger.info(f"1. Navigating to: {target_url}")
+                page.goto(target_url)
+                page.wait_for_load_state("networkidle")
 
-            # Navigate & Interact
-            logger.info(f"1. Navigating to: {target_url}")
-            driver.get(target_url)
-            time.sleep(5)
+                # Handle profile selection modal
+                logger.info("2. Handling profile selection modal...")
+                try:
+                    profile_button = page.locator("button[data-profile='RETAIL']")
+                    if profile_button.is_visible(timeout=5000):
+                        profile_button.click()
+                        page.wait_for_timeout(1000)
 
-            self._handle_modals(driver)
-            self._click_download(driver)
+                    confirm_button = page.locator("#confirmDisclaimer")
+                    if confirm_button.is_visible(timeout=3000):
+                        confirm_button.click()
+                        page.wait_for_timeout(2000)
+                except Exception as e:
+                    logger.debug(f"   Profile modal handling: {e}")
 
-            # Verify Download
-            logger.info(f"6. Waiting for download to complete in '{OUTPUT_DIR}'...")
-            time.sleep(10)
+                # Handle cookie consent
+                logger.info("3. Handling cookie consent...")
+                handle_cookie_consent(page)
+                page.wait_for_timeout(2000)
 
-            for filename in os.listdir(OUTPUT_DIR):
-                if DOWNLOAD_KEYWORD in filename and not filename.endswith(
-                    ".crdownload"
-                ):
-                    file_path = os.path.abspath(os.path.join(OUTPUT_DIR, filename))
-                    return self._parse_downloaded_file(file_path)
+                # Click on the composition tab
+                logger.info("4. Opening the 'Zusammensetzung' tab...")
+                try:
+                    # Try multiple selectors for the composition tab
+                    tab_selectors = [
+                        "button:has-text('ZUSAMMENSETZUNG')",
+                        "button:has-text('Zusammensetzung')",
+                        "[data-tab='composition']",
+                        "a:has-text('Zusammensetzung')",
+                    ]
 
-            logger.error("   - Download failed.")
-            driver.save_screenshot("data/working/temp/amundi_error.png")
+                    for selector in tab_selectors:
+                        tab = page.locator(selector).first
+                        if tab.is_visible(timeout=2000):
+                            tab.click()
+                            page.wait_for_timeout(2000)
+                            break
+                except Exception as e:
+                    logger.warning(f"   Could not click composition tab: {e}")
+
+                # Find and click the download link
+                logger.info("5. Finding and clicking the download link...")
+                download_selectors = [
+                    "a:has-text('KOMPONENTEN DES ETFS HERUNTERLADEN')",
+                    "a:has-text('Komponenten des ETFs herunterladen')",
+                    "a:has-text('Download')",
+                    "a[href*='.xlsx']",
+                    "button:has-text('Download')",
+                ]
+
+                download_path = None
+                for selector in download_selectors:
+                    try:
+                        download_link = page.locator(selector).first
+                        if download_link.is_visible(timeout=3000):
+                            download_path = wait_for_download(
+                                page, lambda s=selector: page.locator(s).first.click()
+                            )
+                            break
+                    except Exception as e:
+                        logger.debug(f"   Download selector {selector} failed: {e}")
+                        continue
+
+                if download_path and os.path.exists(download_path):
+                    logger.info(f"6. Download successful: {download_path}")
+                    return self._parse_downloaded_file(download_path)
+                else:
+                    logger.error("   - Download failed. Saving debug screenshot...")
+                    save_debug_screenshot(page, f"amundi_{isin}_error")
+                    return pd.DataFrame()
+
+        except PlaywrightNotInstalledError as e:
+            logger.error(str(e))
             return pd.DataFrame()
-
         except Exception as e:
             logger.error(f"An unexpected error occurred in Amundi acquisition: {e}")
-            if driver:
-                driver.save_screenshot("data/working/temp/amundi_error.png")
             return pd.DataFrame()
-        finally:
-            if driver:
-                driver.quit()
 
-    def _handle_modals(self, driver):
-        """Handles Profile and Cookie modals."""
-        logger.info("2. Handling profile selection modal...")
-        profile_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@data-profile='RETAIL']"))
-        )
-        driver.execute_script("arguments[0].click();", profile_button)
-        time.sleep(1)
+    def _build_amundi_url(self, isin: str) -> str:
+        """Builds the Amundi product page URL for a given ISIN."""
+        # Amundi URL patterns vary by product
+        # Common pattern for German retail site
+        base_url = "https://www.amundietf.de/de/privatanleger/products"
 
-        confirm_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.ID, "confirmDisclaimer"))
-        )
-        driver.execute_script("arguments[0].click();", confirm_button)
-        time.sleep(5)
+        # Known product slugs (can be expanded)
+        product_slugs = {
+            "FR0010361683": "equity/amundi-stoxx-europe-600-ucits-etf-acc",
+            "LU0908500753": "equity/amundi-prime-global-ucits-etf-dr-c",
+        }
 
-        logger.info("3. Handling cookie consent modal...")
-        cookie_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[contains(., 'Alle annehmen')]")
-            )
-        )
-        driver.execute_script("arguments[0].click();", cookie_button)
-        time.sleep(5)
-
-    def _click_download(self, driver):
-        """Navigates tabs and clicks download."""
-        logger.info("4. Opening the 'Zusammensetzung' tab...")
-        tab = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//button[contains(., 'ZUSAMMENSETZUNG')]")
-            )
-        )
-        driver.execute_script("arguments[0].click();", tab)
-        time.sleep(2)
-
-        logger.info("5. Finding and clicking the download link...")
-        link = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, "//a[contains(., 'KOMPONENTEN DES ETFS HERUNTERLADEN')]")
-            )
-        )
-        driver.execute_script("arguments[0].click();", link)
+        slug = product_slugs.get(isin, f"equity/{isin}")
+        return f"{base_url}/{slug}/{isin}"
 
     def _parse_downloaded_file(self, file_path: str) -> pd.DataFrame:
         """Parses the standard Amundi download format."""
         try:
+            # Amundi files typically have headers on row 9
             df = pd.read_excel(file_path, header=9)
-            df = df[["Name", "ISIN", "Gewichtung (%)"]]
-            df.columns = ["name", "isin", "weight_percentage"]
-            return df
+
+            # Try to find the right columns
+            possible_columns = {
+                "Name": "name",
+                "ISIN": "isin",
+                "Gewichtung (%)": "weight_percentage",
+                "Weight": "weight_percentage",
+                "Weight (%)": "weight_percentage",
+            }
+
+            # Rename columns that exist
+            rename_map = {}
+            for old, new in possible_columns.items():
+                if old in df.columns:
+                    rename_map[old] = new
+
+            if rename_map:
+                df = df.rename(columns=rename_map)
+
+            # Ensure required columns exist
+            if "name" not in df.columns or "weight_percentage" not in df.columns:
+                # Try alternative header positions
+                for header_row in [0, 1, 2, 8, 9, 10]:
+                    try:
+                        df = pd.read_excel(file_path, header=header_row)
+                        df.columns = df.columns.str.strip()
+                        if "Name" in df.columns or "name" in df.columns:
+                            df = df.rename(columns=possible_columns)
+                            break
+                    except Exception:
+                        continue
+
+            # Clean up
+            if "name" in df.columns and "weight_percentage" in df.columns:
+                df = pd.DataFrame(df.dropna(subset=["name", "weight_percentage"]))
+                logger.info(f"   - Parsed {len(df)} holdings from downloaded file.")
+                return pd.DataFrame(df[["name", "isin", "weight_percentage"]])
+
+            logger.error(f"   - Could not find required columns in {file_path}")
+            return pd.DataFrame()
+
         except Exception as e:
             logger.error(f"Failed to parse downloaded file: {e}")
             return pd.DataFrame()

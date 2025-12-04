@@ -161,3 +161,43 @@ Corrected_Quantity = GT_Value_EUR / Actual_Price_EUR_on_Reference_Date
 
 ### Ticker Mapping Fix (Related)
 Discovered Vulcan Energy ticker `VM3.F` was wrong (€0.10 price vs actual €3.18). Fixed to `VUL.DE`. **Lesson:** Extreme recalculation changes (>500%) indicate ticker mapping errors, not quantity errors.
+
+---
+
+## 2025-12-04: Selenium to Playwright Migration
+
+### Context
+Beta tester encountered 14 missing ISIN errors. Investigation revealed several gaps:
+1. 13 ETFs not in adapter registry (iShares, Xtrackers, Vanguard)
+2. 1 stock (Impinj) and 1 ETC (WisdomTree) not in asset universe
+3. No Vanguard adapter existed
+4. Selenium/ChromeDriver version mismatches caused intermittent failures
+
+### Decision
+**Replace Selenium with Playwright** for all browser automation:
+1. Removed `selenium` and `selenium-wire` dependencies
+2. Added `playwright` dependency
+3. Created shared `src/utils/browser.py` with reusable utilities
+4. Refactored `AmundiAdapter` to use Playwright
+5. Built new `VanguardAdapter` using Playwright from start
+
+### Rationale
+- **Reliability:** Playwright bundles its own browser, eliminating ChromeDriver version mismatches
+- **Simpler Downloads:** `expect_download()` API is cleaner than Selenium's file polling
+- **Better Debugging:** Built-in screenshot and trace capabilities
+- **Modern API:** Context managers, better async support, network interception
+
+### Consequences
+**Positive:**
+- Eliminated ChromeDriver version issues entirely
+- Cleaner codebase with shared browser utilities
+- Better error debugging with automatic screenshots
+
+**Negative:**
+- Requires `playwright install chromium` setup step
+- Amundi download selectors need updating (website structure changed)
+- Vanguard only gets top 10 holdings (page limitation, not Playwright limitation)
+
+### Trade-offs Accepted
+- **Vanguard Partial Data:** Accepting top 10 holdings (~25% weight) for now. Full holdings require either API discovery or manual CSV upload. This unblocks beta testers immediately.
+- **Amundi Manual Fallback:** Playwright automation broken for current Amundi website. Manual file upload works perfectly. Will fix selectors in future iteration.

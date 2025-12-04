@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.2.2] - 2025-12-04
+
+### Added
+- **Vanguard Adapter**: New adapter (`src/adapters/vanguard.py`) for fetching holdings from Vanguard ETFs. Supports manual file fallback, BeautifulSoup scraping, and Playwright automation.
+- **Playwright Browser Utilities**: Created `src/utils/browser.py` with shared utilities for browser automation:
+  - `BrowserContext` context manager for Playwright sessions
+  - `handle_cookie_consent()` for common consent dialogs
+  - `wait_for_download()` for file download handling
+  - `save_debug_screenshot()` for debugging
+- **Adapter Test Script**: Created `scripts/test_adapter.py` for testing individual adapters by ISIN.
+- **Beta Tester ISIN Support**: Added 13 new ISINs to adapter registry:
+  - 9 iShares ETFs with product IDs discovered via JustETF
+  - 2 Xtrackers ETFs (LU0292104469, IE00BGV5VN51)
+  - 1 Vanguard ETF (IE00BK5BQT80)
+  - 1 WisdomTree ETC marked as "ignore" (synthetic commodity)
+- **Asset Universe Expansion**: Added Impinj Inc (US7223041028) and WisdomTree Industrial Metals ETC (IE00BF4TWC33).
+
+### Changed
+- **Selenium → Playwright Migration**: Replaced Selenium/selenium-wire with Playwright for browser automation:
+  - `src/adapters/amundi.py`: Refactored to use Playwright
+  - `src/adapters/vanguard.py`: Built with Playwright from start
+  - Eliminated ChromeDriver version issues
+  - Better download handling via `expect_download()`
+- **Dependencies**: Removed `selenium`, `selenium-wire`; added `playwright`
+- **QUICKSTART.md**: Added `playwright install chromium` to setup instructions
+
+### Known Limitations
+- **Vanguard**: Only extracts top 10 holdings (~25% weight) from rendered page. Full holdings require manual CSV upload.
+- **Amundi Playwright**: Download button selectors need updating for current website structure. Manual file fallback works correctly.
+
+---
+
 ## [0.2.1] - 2025-12-04
 
 ### Added

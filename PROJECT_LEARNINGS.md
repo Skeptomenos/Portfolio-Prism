@@ -156,3 +156,12 @@
 - **Snapshot Strategy:** Daily JSON snapshots enable historical tracking without database complexity. Key: auto-trigger on dashboard load with staleness check (>24h). Store in `data/working/snapshots/` with date-based filenames.
 - **Cost Basis from API:** pytr provides `avgCost` per position, enabling P/L calculations without manual tracking. Derive current price from `netValue/quantity` when not directly available.
 - **Phased Implementation:** 4-phase dashboard enhancement (Performance → Concentration → Overlap → Snapshots) allowed iterative validation. Each phase testable in isolation before proceeding.
+
+### Phase 22: Beta Tester ISIN Fix & Playwright Migration (2025-12-04)
+- **Beta Tester Value:** Real users find gaps faster than developers. 14 missing ISINs discovered in minutes vs. months of internal testing. **Rule:** Ship to beta testers early; their portfolios are the best test suite.
+- **JustETF for Product IDs:** iShares product IDs (required for API calls) can be discovered via JustETF URLs. Pattern: `justETF.com/etf-profile.html?isin={ISIN}` → extract product ID from iShares link. **Rule:** When provider doesn't document IDs, use aggregator sites.
+- **Selenium → Playwright:** ChromeDriver version mismatches are the #1 cause of Selenium failures. Playwright bundles its own browser, eliminating this entirely. **Rule:** For new projects, default to Playwright over Selenium.
+- **Scraper Limitations:** Modern financial sites (Vanguard, Amundi) use heavy JavaScript and pagination. Scrapers often get partial data (top 10 holdings). **Rule:** Always implement manual file fallback alongside automation. Users can download what scrapers can't.
+- **Network Interception:** Playwright's `page.on("response")` captures API calls during navigation. Useful for discovering hidden JSON endpoints. Even if APIs don't return full data, they reveal structure for future work.
+- **Shared Browser Utilities:** Extract common patterns (cookie consent, downloads, screenshots) into `src/utils/browser.py`. Reduces duplication across adapters. Context manager pattern (`with BrowserContext()`) ensures cleanup.
+- **Ignore Strategy:** For synthetic products (commodity ETCs like WisdomTree Industrial Metals), mark as "ignore" in adapter registry rather than failing. These products don't have traditional holdings to decompose.

@@ -13,7 +13,12 @@ source venv/bin/activate
 
 # Install the package in editable mode
 pip install -e .
+
+# Install Playwright browser (required for Vanguard/Amundi ETFs)
+playwright install chromium
 ```
+
+> **Note:** The `playwright install chromium` step downloads a headless browser (~80MB) used for scraping ETF holdings from providers like Vanguard and Amundi.
 
 ## 3. Setup Data
 1.  **Portfolio:** Place your Trade Republic PDF exports (e.g., `Umsatzübersicht.pdf`) in:

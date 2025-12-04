@@ -25,6 +25,9 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -e .
+
+# Install browser for ETF scraping (Vanguard, Amundi)
+playwright install chromium
 ```
 
 ### 3. Get Your API Key (Free)
@@ -89,7 +92,7 @@ If API access fails, you can use PDF exports:
 The pipeline will:
 1. **Fetch/Parse holdings** - Get your current positions
 2. **Fetch live prices** - Get current EUR prices from Yahoo Finance
-3. **Decompose ETFs** - Download underlying holdings from iShares, VanEck, Xtrackers, Amundi
+3. **Decompose ETFs** - Download underlying holdings from iShares, VanEck, Xtrackers, Amundi, Vanguard
 4. **Calculate true exposure** - Aggregate your real exposure to each stock
 5. **Generate reports** - Save results to `outputs/`
 
@@ -146,15 +149,23 @@ The interactive Streamlit dashboard has 6 tabs:
 
 *The system can work without API keys using cached data, but resolution of new securities will be limited.
 
-### Amundi ETFs (Manual Setup)
+### Amundi & Vanguard ETFs (Manual Setup)
 
-Amundi doesn't provide easy API access. If you own Amundi ETFs:
+Some providers don't offer easy API access. If automated fetching fails:
 
-1. Go to [amundi.com](https://www.amundi.com)
+**Amundi:**
+1. Go to [amundietf.de](https://www.amundietf.de)
 2. Find your ETF and download the "Zusammensetzung" (Holdings) XLSX
 3. Save it as `data/inputs/manual_holdings/{ISIN}.xlsx`
 
 Example: `data/inputs/manual_holdings/FR0010361683.xlsx`
+
+**Vanguard:**
+1. Go to [de.vanguard](https://www.de.vanguard/professionell/anlageprodukte/etf)
+2. Find your ETF and look for a holdings download option
+3. Save it as `data/inputs/manual_holdings/{ISIN}.csv`
+
+> **Note:** The automated Vanguard scraper currently only fetches the top 10 holdings. For complete data, use the manual CSV method.
 
 ### First Run Behavior
 
@@ -247,12 +258,14 @@ flowchart TB
 |---------|----------|
 | `command not found` | Run `source venv/bin/activate` |
 | `FINNHUB_API_KEY not set` | Create `.env` file with your API key |
-| `ModuleNotFoundError` | Run `pip install -e .` to install all dependencies |
+| `pytr not found` | Run `pip install pytr` |
 | `pytr authentication failed` | Run `python scripts/fetch_tr_api.py --reconfigure` to update credentials |
 | `No trades found in PDF` | Make sure it's the "Kontoauszug" (Account Statement), not a monthly securities report |
 | `Wrong quantities` | Delete `calculated_holdings.csv` and re-run to reprocess all PDFs |
 | `No price for ISIN` | Check if ticker exists on Yahoo Finance |
 | `Amundi download failed` | Use manual XLSX file (see Configuration) |
+| `Vanguard only shows 10 holdings` | This is a known limitation; use manual CSV for full data |
+| `playwright not found` | Run `playwright install chromium` |
 | Dashboard won't start | Check port 8501 is free, or use `--server.port 8502` |
 
 ### Reset Everything
@@ -316,6 +329,7 @@ flowchart TB
         VanEck["VanEck"]
         Xtrackers["Xtrackers"]
         Amundi["Amundi"]
+        Vanguard["Vanguard"]
         ETFHoldings["ETF Holdings"]
     end
 
@@ -353,9 +367,9 @@ flowchart TB
 
     Direct & ETFs --> YFinance --> Prices
 
-    ETFs --> iShares & VanEck & Xtrackers & Amundi
-    ManualETF --> Amundi
-    iShares & VanEck & Xtrackers & Amundi --> ETFHoldings
+    ETFs --> iShares & VanEck & Xtrackers & Amundi & Vanguard
+    ManualETF --> Amundi & Vanguard
+    iShares & VanEck & Xtrackers & Amundi & Vanguard --> ETFHoldings
 
     ETFHoldings --> Classification --> Resolution
     Resolution --> Finnhub & Wikidata

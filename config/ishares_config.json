@@ -38,5 +38,59 @@
         "product_id": "304353",
         "region": "de",
         "user_type": "privatanleger"
+    },
+    "IE00BYXG2H39": {
+        "product_id": "291450",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "2B70"
+    },
+    "IE00B5L8K969": {
+        "product_id": "253723",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "CEBL"
+    },
+    "IE00BG0J4C88": {
+        "product_id": "297843",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "L0CK"
+    },
+    "IE00BGL86Z12": {
+        "product_id": "307130",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "IEVD"
+    },
+    "IE00B8JVMZ80": {
+        "product_id": "251911",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "IQQH"
+    },
+    "IE00BYZK4552": {
+        "product_id": "284219",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "2B76"
+    },
+    "IE00BYZK4883": {
+        "product_id": "284217",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "2B79"
+    },
+    "IE00BYZK4776": {
+        "product_id": "284216",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "2B78"
+    },
+    "IE00BKTLJC87": {
+        "product_id": "310714",
+        "region": "de",
+        "user_type": "privatanleger",
+        "ticker": "AYEU"
     }
 }

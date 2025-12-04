@@ -9,43 +9,25 @@ description = "Portfolio True Exposure POC"
 authors = [{name = "David Helmus", email = "david@example.com"}]
 requires-python = ">=3.9"
 dependencies = [
-    # Core
-    "pandas>=2.0.0",
-    "pydantic>=2.0",
-    
-    # Data acquisition
-    "pytr>=0.4.2",           # Trade Republic API
-    "selenium",
-    "selenium-wire",
-    "blinker==1.7.0",        # Pin for selenium-wire compatibility (1.8+ breaks it)
-    "webdriver-manager",
+    "pandas",
+    "playwright",
+    "yfinance",
+    "python-dotenv",
     "requests",
     "beautifulsoup4",
     "lxml",
-    
-    # Data processing
-    "yfinance",
     "pdfplumber",
+    "deep-translator",
+    "tqdm",
     "python-calamine",
     "openpyxl",
-    "deep-translator",
+    "pytest",
     "pandera",
-    "cryptography",
-    
-    # Dashboard
-    "streamlit>=1.30",
-    "plotly>=5.18",
-    
-    # Utils
-    "python-dotenv",
-    "tqdm",
+    "cryptography",  # Required by pdfplumber
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "ruff",
-]
+[project.scripts]
+install-browsers = "playwright._impl._driver:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
