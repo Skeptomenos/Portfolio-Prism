@@ -136,3 +136,9 @@
 - **Auto-Backup on Overwrite:** Before overwriting user data files, create timestamped backups automatically (e.g., `file.2025-12-03_143022.csv.bak`). Users trust tools that preserve their data.
 - **Interactive Menu UX:** For CLI tools with multiple input methods, provide an interactive menu with sensible defaults. "Press Enter for recommended option" reduces friction for new users.
 - **Fallback Messaging:** When primary method fails, provide clear error message + explicit fallback instructions. Don't auto-switch (user should decide) but make alternatives obvious.
+
+### Phase 20: CSV Column Collision & pytr Format Fix (2025-12-04)
+- **Column Name Collision:** When merging CSVs with `pd.merge()`, duplicate column names create `_x`/`_y` suffixes. Code expecting original column name fails with `KeyError`. **Rule:** Always prefix source-specific columns to avoid collisions (e.g., `TR_Name` instead of `Name`).
+- **External Tool Output Formats:** pytr v0.4.2 outputs 5 columns (`Name;ISIN;quantity;avgCost;netValue`), not 6 as previously assumed. The `price` field doesn't exist; `netValue` is calculated internally by pytr. **Rule:** Always verify external tool output format against actual source code, not assumptions or documentation.
+- **Derived Values:** When a value isn't directly available, derive it from related fields. `current_price = netValue / quantity`. Document the derivation clearly in code comments.
+- **Auto-Grow Universe:** When new ISINs appear in holdings but aren't in the asset universe, auto-add them using available metadata (TR_Name) rather than failing. Mark source as `auto_tr` for auditability. The universe should be the ultimate source of truth and grow automatically.

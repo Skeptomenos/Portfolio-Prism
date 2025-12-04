@@ -1,5 +1,6 @@
 import math
 import os
+from datetime import date
 from typing import Any, List, Optional, Tuple
 
 import pandas as pd
@@ -27,10 +28,75 @@ UNIVERSE_PATH = "config/asset_universe.csv"
 HOLDINGS_PATH = "data/working/calculated_holdings.csv"  # Calculated from PDF parser
 
 
+def _auto_add_to_universe(unmapped_df: pd.DataFrame, universe_df: pd.DataFrame) -> None:
+    """
+    Auto-add unmapped ISINs to the asset universe using TR_Name as the name.
+
+    This ensures the universe grows to include all positions from Trade Republic,
+    making it the ultimate source of truth for asset metadata.
+
+    Args:
+        unmapped_df: DataFrame of holdings that couldn't be mapped to universe
+        universe_df: Current universe DataFrame (for column reference)
+    """
+    new_entries = []
+    today = date.today().isoformat()
+
+    for _, row in unmapped_df.iterrows():
+        isin = row.get("ISIN", "")
+        tr_name = row.get("TR_Name", "Unknown")
+
+        if not isin:
+            continue
+
+        # Determine asset class heuristically
+        # ETF ISINs typically start with IE, LU, DE (for European ETFs)
+        # and often have "ETF" or fund-like names
+        name_lower = str(tr_name).lower()
+        is_etf = any(
+            keyword in name_lower
+            for keyword in ["etf", "ishares", "msci", "s&p", "nasdaq", "stoxx", "core"]
+        )
+        asset_class = "ETF" if is_etf else "Stock"
+
+        new_entry = {
+            "ISIN": isin,
+            "TR_Ticker": "",  # Unknown, can be enriched later
+            "Yahoo_Ticker": "",  # Unknown, can be enriched later
+            "Name": tr_name,
+            "Aliases": "",
+            "Provider": "ishares" if "ishares" in name_lower else "",
+            "Asset_Class": asset_class,
+            "Source": "auto_tr",
+            "Added_Date": today,
+            "Last_Verified": "",
+        }
+        new_entries.append(new_entry)
+        logger.info(f"  Auto-adding to universe: {isin} ({tr_name}) as {asset_class}")
+
+    if new_entries:
+        # Append to universe CSV
+        new_df = pd.DataFrame(new_entries)
+
+        # Ensure columns match universe
+        for col in universe_df.columns:
+            if col not in new_df.columns:
+                new_df[col] = ""
+
+        # Reorder columns to match universe
+        new_df = new_df[universe_df.columns]
+
+        # Append to file
+        new_df.to_csv(UNIVERSE_PATH, mode="a", header=False, index=False)
+        logger.info(f"Added {len(new_entries)} new entries to asset universe.")
+
+
 def load_portfolio_state():
     """
     Loads the portfolio state from the Relational CSVs (Universe + Holdings).
     Prioritizes the new model, falls back to legacy if needed.
+
+    Auto-adds unmapped ISINs to the universe using TR_Name as fallback.
 
     Returns:
         (direct_positions, etf_positions) - Tuple of DataFrames
@@ -44,16 +110,27 @@ def load_portfolio_state():
             df_uni = pd.read_csv(UNIVERSE_PATH)
             df_hold = pd.read_csv(HOLDINGS_PATH)
 
-            # Merge
-            # We merge on ISIN.
+            # Merge on ISIN
             df = pd.merge(df_hold, df_uni, on="ISIN", how="left")
 
-            # Check for unmapped assets
+            # Check for unmapped assets and auto-add to universe
             unmapped = df[df["Name"].isna()]
             if not unmapped.empty:
                 logger.warning(
-                    f"{len(unmapped)} assets in Holdings could not be mapped to Universe (Check ISINs)."
+                    f"{len(unmapped)} assets in Holdings not in Universe. Auto-adding..."
                 )
+                _auto_add_to_universe(unmapped, df_uni)
+
+                # Reload universe and re-merge
+                df_uni = pd.read_csv(UNIVERSE_PATH)
+                df = pd.merge(df_hold, df_uni, on="ISIN", how="left")
+
+                # Verify all mapped now
+                still_unmapped = df[df["Name"].isna()]
+                if not still_unmapped.empty:
+                    logger.error(
+                        f"{len(still_unmapped)} assets still unmapped after auto-add!"
+                    )
         else:
             logger.warning(f"Calculated holdings file not found: {HOLDINGS_PATH}")
             logger.warning(
@@ -80,12 +157,21 @@ def load_portfolio_state():
             "Asset_Class": "asset_type",
             "Yahoo_Ticker": "ticker_src",  # Important for market.py
             "Provider": "provider",
+            # Performance fields from pytr (if available)
+            "AvgCost": "avg_cost",
+            "CurrentPrice": "tr_price",
+            "NetValue": "tr_value",
         }
     )
 
     # Fill NAs
     df_clean["name"] = df_clean["name"].fillna("Unknown Asset")
     df_clean["asset_type"] = df_clean["asset_type"].fillna("Stock")
+
+    # Ensure performance columns exist (may be missing in old CSV format)
+    for col in ["avg_cost", "tr_price", "tr_value"]:
+        if col not in df_clean.columns:
+            df_clean[col] = None
 
     # Split
     direct_positions = df_clean[df_clean["asset_type"] == "Stock"].copy()

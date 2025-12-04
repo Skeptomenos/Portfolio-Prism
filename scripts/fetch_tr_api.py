@@ -8,6 +8,22 @@ Usage:
 
 First run: Prompts for phone number and PIN, saves to .env
 Subsequent runs: Uses saved credentials, may need 4-digit code from TR app
+
+Output CSV format (calculated_holdings.csv):
+    ISIN,Quantity,AvgCost,CurrentPrice,NetValue,TR_Name
+
+    - ISIN: 12-character security identifier
+    - Quantity: Number of shares/units held
+    - AvgCost: Average purchase price from TR (for P/L calculation)
+    - CurrentPrice: Derived from NetValue/Quantity (TR's real-time price)
+    - NetValue: Current market value from TR (price * quantity)
+    - TR_Name: Security name from Trade Republic (used as fallback if not in universe)
+
+Note on data sources:
+    - pytr v0.4.2 outputs: Name;ISIN;quantity;avgCost;netValue (5 columns)
+    - pytr fetches real-time prices from TR's ticker API internally
+    - We derive CurrentPrice = NetValue / Quantity
+    - TR_Name is prefixed to avoid column collision with asset_universe.csv
 """
 
 import os
@@ -201,45 +217,113 @@ def fetch_portfolio_via_pytr(phone: str, pin: str) -> Optional[Path]:
         return None
 
 
-def convert_and_save_holdings(raw_csv_path: Path) -> int:
+def convert_and_save_holdings(raw_csv_path: Path) -> tuple[int, float, float]:
     """
     Convert pytr format (semicolon) to pipeline format (comma).
-    Extract only ISIN and quantity columns.
+    Preserves all pytr fields including avgCost for P/L calculation.
 
-    Returns number of positions saved.
+    pytr CSV format (v0.4.2): Name;ISIN;quantity;avgCost;netValue (5 columns)
+    Note: pytr calculates netValue = current_price * quantity internally.
+          We derive current_price = netValue / quantity.
+
+    Returns:
+        tuple: (position_count, total_cost_basis, total_net_value)
     """
     positions = []
+    total_cost_basis = 0.0
+    total_net_value = 0.0
 
-    with open(raw_csv_path, "r") as f:
+    with open(raw_csv_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     # Skip header, parse data
+    # pytr format (v0.4.2): Name;ISIN;quantity;avgCost;netValue
     for line in lines[1:]:
         line = line.strip()
         if not line:
             continue
 
-        # pytr format: name;isin;quantity;...
         parts = line.split(";")
-        if len(parts) >= 3:
+        if len(parts) >= 5:
+            # pytr v0.4.2 format: Name;ISIN;quantity;avgCost;netValue
+            name = parts[0].strip()
             isin = parts[1].strip()
             quantity = parts[2].strip()
+            avg_cost = parts[3].strip()
+            net_value = parts[4].strip()
+
+            # Derive current_price from netValue / quantity
+            # This is the price pytr fetched from TR's real-time ticker
+            current_price = ""
+            try:
+                qty = float(quantity.replace(",", ".")) if quantity else 0.0
+                value = float(net_value.replace(",", ".")) if net_value else 0.0
+                if qty > 0:
+                    current_price = f"{value / qty:.4f}"
+            except (ValueError, TypeError):
+                pass
 
             # Validate ISIN format
             if re.match(r"^[A-Z]{2}[A-Z0-9]{10}$", isin):
-                positions.append((isin, quantity))
+                positions.append(
+                    {
+                        "isin": isin,
+                        "quantity": quantity,
+                        "avg_cost": avg_cost,
+                        "current_price": current_price,
+                        "net_value": net_value,
+                        "name": name,
+                    }
+                )
+
+                # Calculate totals for summary
+                try:
+                    qty = float(quantity.replace(",", ".")) if quantity else 0.0
+                    cost = float(avg_cost.replace(",", ".")) if avg_cost else 0.0
+                    value = float(net_value.replace(",", ".")) if net_value else 0.0
+                    total_cost_basis += qty * cost
+                    total_net_value += value
+                except (ValueError, TypeError):
+                    pass  # Skip invalid numbers for totals
+
+        elif len(parts) >= 3:
+            # Fallback: minimal format (backward compatibility with old pytr versions)
+            name = parts[0].strip() if parts[0] else ""
+            isin = parts[1].strip()
+            quantity = parts[2].strip()
+
+            if re.match(r"^[A-Z]{2}[A-Z0-9]{10}$", isin):
+                positions.append(
+                    {
+                        "isin": isin,
+                        "quantity": quantity,
+                        "avg_cost": "",
+                        "current_price": "",
+                        "net_value": "",
+                        "name": name,
+                    }
+                )
 
     if not positions:
         print("\n[ERROR] No valid positions found in pytr output")
-        return 0
+        return 0, 0.0, 0.0
 
-    # Write to calculated_holdings.csv
-    with open(HOLDINGS_FILE, "w") as f:
-        f.write("ISIN,Quantity\n")
-        for isin, quantity in positions:
-            f.write(f"{isin},{quantity}\n")
+    # Write to calculated_holdings.csv with all fields
+    # Format: ISIN,Quantity,AvgCost,CurrentPrice,NetValue,TR_Name
+    # Note: TR_Name (not Name) to avoid column collision with asset_universe.csv
+    with open(HOLDINGS_FILE, "w", encoding="utf-8") as f:
+        f.write("ISIN,Quantity,AvgCost,CurrentPrice,NetValue,TR_Name\n")
+        for pos in positions:
+            # Escape commas in name field by quoting
+            name = pos["name"].replace('"', '""')  # Escape quotes
+            if "," in name or '"' in name:
+                name = f'"{name}"'
+            f.write(
+                f"{pos['isin']},{pos['quantity']},{pos['avg_cost']},"
+                f"{pos['current_price']},{pos['net_value']},{name}\n"
+            )
 
-    return len(positions)
+    return len(positions), total_cost_basis, total_net_value
 
 
 def display_fallback_message(error: str = ""):
@@ -282,25 +366,28 @@ def main():
         sys.exit(1)
 
     # Convert and save
-    count = convert_and_save_holdings(raw_csv)
+    count, total_cost, total_value = convert_and_save_holdings(raw_csv)
 
     if count == 0:
         display_fallback_message("No positions parsed")
         sys.exit(1)
 
-    # Calculate total value if available
-    try:
-        import pandas as pd
+    # Display summary with P/L information
+    print(f"\n[OK] Fetched {count} positions from Trade Republic")
 
-        raw_df = pd.read_csv(raw_csv, sep=";")
-        if "netValue" in raw_df.columns:
-            total_value = raw_df["netValue"].sum()
-            print(f"\n[OK] Fetched {count} positions from Trade Republic")
-            print(f"     Total value: EUR {total_value:,.2f}")
-        else:
-            print(f"\n[OK] Fetched {count} positions from Trade Republic")
-    except Exception:
-        print(f"\n[OK] Fetched {count} positions from Trade Republic")
+    if total_value > 0:
+        print(f"     Current Value:  EUR {total_value:>12,.2f}")
+
+        if total_cost > 0:
+            unrealized_pl = total_value - total_cost
+            unrealized_pl_pct = ((total_value / total_cost) - 1) * 100
+
+            print(f"     Cost Basis:     EUR {total_cost:>12,.2f}")
+            pl_sign = "+" if unrealized_pl >= 0 else ""
+            print(
+                f"     Unrealized P/L: EUR {pl_sign}{unrealized_pl:>11,.2f} "
+                f"({pl_sign}{unrealized_pl_pct:.2f}%)"
+            )
 
     print(f"     Saved to: {HOLDINGS_FILE.relative_to(PROJECT_ROOT)}")
 

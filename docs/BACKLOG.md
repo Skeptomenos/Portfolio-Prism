@@ -5,3 +5,4 @@ This document tracks feature requests and known limitations, automatically gener
 
 - [ ] Create adapter for provider: 'vanguard' (Triggered by ISIN: DE0007500001 on 2025-11-23)
 - [ ] Add CI check or pre-commit hook to verify critical output files aren't modified by test runs (Test Isolation - 2025-12-03)
+- [ ] **TR API Refactor**: Gain full control over data acquisition by creating thin wrapper around pytr for raw data only, with configurable price sources (TR Ticker vs Yahoo). See `docs/plans/tr-api-refactor-plan.md` for full analysis. (Data Control - 2025-12-04)

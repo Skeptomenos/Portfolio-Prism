@@ -1,63 +1,64 @@
-# Active State: v0.2.0 Release - pytr Deep Integration
+# Active State: Pipeline Fixed - NVIDIA Now Visible
 
 ## Status: COMPLETE
 
-Released v0.2.0 with seamless Trade Republic API integration via pytr.
+Fixed column name collision that was breaking the pipeline and preventing NVIDIA from appearing.
 
 ## Session Summary
 
-### What Was Done
-1. **Created `scripts/fetch_tr_api.py`** - Full pytr wrapper with:
-   - Credential management (load from `.env`, prompt if missing)
-   - Privacy notice for first-run
-   - `--reconfigure` flag to update credentials  
-   - Auto-backup with timestamp before overwrite
-   - Session cookies in `~/.pytr/cookies/`
-   - Error handling with PDF fallback suggestions
+### Issues Fixed
 
-2. **Rewrote `run.sh`** - Interactive menu with:
-   - API as default option (press Enter)
-   - PDF as fallback option
-   - Waits indefinitely for user input
-   - Graceful fallback on API failure
+1. **pytr 5-column format** - Parser was expecting 6 columns, pytr outputs 5
+2. **Column name collision** - Both holdings CSV and universe CSV had `Name` column
+3. **Pipeline crash** - Merge created `Name_x`/`Name_y`, code looked for `Name`
 
-3. **Updated documentation**:
-   - README.md: New quickstart with API-first workflow
-   - .env.example: Added TR credentials placeholders
-   - requirements.txt: Added pytr>=0.4.2
-   - MVP-plan.md: Marked Phase 2 complete
-   - CHANGELOG.md: Added v0.2.0 release notes
-   - PROJECT_LEARNINGS.md: Added Phase 19 learnings
+### Changes Made
 
-## New User Workflow
+| File | Change |
+|------|--------|
+| `scripts/fetch_tr_api.py` | Renamed `Name` → `TR_Name` in CSV output |
+| `src/data/state_manager.py` | Added `_auto_add_to_universe()` function |
+| `data/working/calculated_holdings.csv` | Updated header to use `TR_Name` |
+| `docs/plans/tr-api-refactor-plan.md` | Created comprehensive future refactor plan |
+| `docs/BACKLOG.md` | Added TR API refactor task |
 
-```bash
-bash run.sh
-# Select [1] Trade Republic API (press Enter for default)
-# First run: Enter phone + PIN (saved to .env)
-# Enter 4-digit code from TR app
-# Done! Pipeline runs automatically
+### Verification
+
+**NVIDIA now correctly appears as #1 holding:**
+```
+ISIN: US67066G1040
+Direct: €1,595.33
+Indirect (via ETFs): €3,595.12
+Total Exposure: €5,190.45 (12.4% of portfolio)
 ```
 
-## Files Changed
+**Pipeline output:**
+- 19 Stocks loaded
+- 10 ETFs loaded
+- 1,792 exposures calculated
+- All validation checks passed
 
-| File | Action |
-|------|--------|
-| `scripts/fetch_tr_api.py` | **Created** |
-| `run.sh` | **Rewritten** |
-| `requirements.txt` | Modified (+pytr) |
-| `.env.example` | Modified (+TR creds) |
-| `README.md` | Modified (new quickstart) |
-| `docs/plans/MVP-plan.md` | Modified (Phase 2 complete) |
-| `docs/plans/pytr-phase2-plan.md` | Modified (implementation details) |
-| `CHANGELOG.md` | Modified (v0.2.0) |
-| `PROJECT_LEARNINGS.md` | Modified (Phase 19) |
-| `.context/handover.md` | Updated |
+## Auto-Add to Universe
+
+New feature: Unmapped ISINs are now automatically added to `asset_universe.csv` using:
+- `TR_Name` as the security name
+- Heuristic asset class detection (ETF vs Stock)
+- Source marked as `auto_tr`
+
+## Tests
+
+All 47 tests pass.
 
 ## Next Steps
 
-MVP Phases 3-6 remaining:
-- Phase 3: Remove Selenium Dependency
-- Phase 4: Reduce API Dependency  
-- Phase 5: Docker Container
-- Phase 6: UX Polish
+1. Run dashboard to verify visual display: `./run_dashboard.sh`
+2. Consider Phase 2: Performance Dashboard Tab (P/L display)
+
+## Files Changed This Session
+
+```
+scripts/fetch_tr_api.py          # TR_Name column, 5-col parsing
+src/data/state_manager.py        # Auto-add to universe
+docs/plans/tr-api-refactor-plan.md   # Future refactor plan
+docs/BACKLOG.md                  # Added backlog item
+```
