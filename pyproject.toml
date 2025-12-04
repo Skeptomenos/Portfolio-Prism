@@ -9,25 +9,41 @@ description = "Portfolio True Exposure POC"
 authors = [{name = "David Helmus", email = "david@example.com"}]
 requires-python = ">=3.9"
 dependencies = [
-    "pandas",
+    # Core
+    "pandas>=2.0.0",
+    "pydantic>=2.0",
+    
+    # Data acquisition
+    "pytr>=0.4.2",           # Trade Republic API
     "selenium",
     "selenium-wire",
     "webdriver-manager",
-    "yfinance",
-    "python-dotenv",
     "requests",
+    "beautifulsoup4",
+    "lxml",
+    
+    # Data processing
+    "yfinance",
     "pdfplumber",
-    "deep-translator",
-    "tqdm",
     "python-calamine",
     "openpyxl",
-    "pytest",
+    "deep-translator",
     "pandera",
-    "cryptography",  # Required by pdfplumber
-    "pytr>=0.4.2",  # Trade Republic API
-    "pydantic>=2.0",  # Data models
-    "streamlit>=1.30",  # Dashboard
-    "plotly>=5.18",  # Dashboard charts
+    "cryptography",
+    
+    # Dashboard
+    "streamlit>=1.30",
+    "plotly>=5.18",
+    
+    # Utils
+    "python-dotenv",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
 ]
 
 [tool.setuptools.packages.find]
