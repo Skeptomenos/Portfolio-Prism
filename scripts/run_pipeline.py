@@ -26,6 +26,7 @@ from datetime import datetime
 from src.utils.metrics import tracker
 from src.core.health import health
 from src.data.enrichment import load_asset_universe
+from src.data.holdings_cache import HoldingsCache, ManualUploadRequired
 
 logger = get_logger(__name__)
 
@@ -118,8 +119,9 @@ def run_pipeline():
     except Exception as e:
         logger.warning(f"Health check failed: {e}")
 
-    # --- Setup Adapter Registry (after potential updates) ---
+    # --- Setup Adapter Registry and Holdings Cache ---
     adapter_registry = AdapterRegistry()
+    holdings_cache = HoldingsCache()
 
     # --- Phase 2.5 (Market Data) ---
     # Combine to fetch prices for ALL assets (Stocks + ETFs)
@@ -175,28 +177,45 @@ def run_pipeline():
         try:
             logger.info(f"--- Processing ETF: {etf['name']} ({isin}) ---")
 
-            # 1. Get Adapter
-            adapter = adapter_registry.get_adapter(isin)
-            if not adapter:
-                failed_etfs.append((isin, "No adapter registered for this ISIN."))
-                tracker.increment_system_metric("etfs_failed")
-                health.record_etf_stat(isin, 0, 0.0, "NO_ADAPTER")
-                health.record_failure(
-                    "ETF_DECOMPOSITION",
-                    isin,
-                    "No adapter found",
-                    "Update src/adapters/registry.py",
-                    "HIGH",
-                )
-                continue
+            # Option B: Direct cache check in pipeline
+            # TIER 1 & 2: Try holdings cache first (local cache + community data)
+            try:
+                holdings = holdings_cache.get_holdings(isin)
+                logger.info(f"  -> Found in holdings cache ({len(holdings)} holdings)")
+                tracker.increment_system_metric("cache_hits")
+            except ManualUploadRequired:
+                # Cache miss - fall through to adapter
+                holdings = None
 
-            tracker.increment_system_metric("etfs_with_adapter")
+            # TIER 3: Fall back to adapter/scraper if cache missed
+            if holdings is None or (
+                isinstance(holdings, pd.DataFrame) and holdings.empty
+            ):
+                adapter = adapter_registry.get_adapter(isin)
+                if not adapter:
+                    failed_etfs.append((isin, "No adapter registered for this ISIN."))
+                    tracker.increment_system_metric("etfs_failed")
+                    health.record_etf_stat(isin, 0, 0.0, "NO_ADAPTER")
+                    health.record_failure(
+                        "ETF_DECOMPOSITION",
+                        isin,
+                        "No adapter found",
+                        "Update src/adapters/registry.py or upload to data/inputs/manual_holdings/",
+                        "HIGH",
+                    )
+                    continue
 
-            # 2. Fetch Data
-            holdings = adapter.fetch_holdings(isin)
+                tracker.increment_system_metric("etfs_with_adapter")
+                holdings = adapter.fetch_holdings(isin)
+
+                # Save successful fetch to local cache for next time
+                if holdings is not None and not holdings.empty:
+                    holdings_cache._save_to_local_cache(
+                        isin, holdings, source="adapter_fetch", name=etf["name"]
+                    )
 
             # HEALTH CHECK: ETF Stats
-            if not holdings.empty:
+            if holdings is not None and not holdings.empty:
                 count = len(holdings)
                 weight_sum = (
                     holdings["weight_percentage"].sum()
@@ -211,12 +230,12 @@ def run_pipeline():
                     "ETF_DECOMPOSITION",
                     isin,
                     "Returned empty holdings",
-                    "Check provider website or file",
+                    "Check provider website or upload to data/inputs/manual_holdings/",
                     "HIGH",
                 )
-                failed_etfs.append((isin, "Adapter returned no data."))
+                failed_etfs.append((isin, "No holdings data available."))
                 tracker.increment_system_metric("etfs_failed")
-                continue  # Continue if holdings are empty, no further processing for this ETF
+                continue
 
             # 3. Validate Data
             holdings = HoldingsSchema.validate(holdings)
@@ -227,6 +246,17 @@ def run_pipeline():
                 f"--- Successfully fetched and validated {len(holdings)} holdings for {etf['name']}. ---"
             )
 
+        except ManualUploadRequired as e:
+            logger.warning(f"Manual upload required for {etf['name']}: {e}")
+            failed_etfs.append((isin, f"Manual upload required: {e}"))
+            health.record_failure(
+                "ETF_DECOMPOSITION",
+                isin,
+                str(e),
+                f"Upload holdings to data/inputs/manual_holdings/{isin}.csv",
+                "HIGH",
+            )
+            tracker.increment_system_metric("etfs_failed")
         except AdapterNotImplementedError as e:
             logger.warning(f"Skipping {etf['name']}: {e}")
             failed_etfs.append((isin, f"Not Implemented: {e} (Added to Roadmap)"))

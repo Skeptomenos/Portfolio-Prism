@@ -1,45 +1,69 @@
-# Active State: Docker MVP - Holdings Cache Complete
+# Active State: Vanguard US API Integration - COMPLETE
 
-**Objective:** Docker MVP with 3-tier holdings cache | **Status:** IN PROGRESS | **Date:** 2025-12-04
+**Objective:** Full Vanguard holdings via US API | **Status:** COMPLETE | **Date:** 2025-12-04
 
 ## Summary
 
-Completed Phase 2 (Holdings Cache System) of Docker MVP. The 3-tier cache provides offline-first resolution for ETF holdings.
+Implemented Vanguard US API integration to fetch complete ETF holdings with ISINs. European Vanguard ETFs now get full holdings data by mapping to their US equivalents.
 
 ## Completed This Session
 
 | Task | Status |
 |------|--------|
-| Exception consolidation (`ManualUploadRequired`) | ✅ Complete |
-| `amundi.py` now imports from `holdings_cache.py` | ✅ Complete |
+| Discovered Vanguard US API endpoint | ✅ Complete |
+| Added VANGUARD_US_EQUIVALENTS mapping | ✅ Complete |
+| Implemented `_fetch_via_us_api()` with pagination | ✅ Complete |
+| Fixed pagination params (start/count vs offset/limit) | ✅ Complete |
 | All 86 tests pass | ✅ Verified |
 
-## Phase Status
+## API Details
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 1 | Docker Foundation | ✅ Complete |
-| Phase 2 | Holdings Cache System | ✅ Complete |
-| Phase 3 | Dashboard UX (sync, upload, stats) | ⏳ Next |
-| Phase 4 | Build & Deploy | ⏳ Pending |
+**Endpoint:**
+```
+https://investor.vanguard.com/investment-products/etfs/profile/api/{FUND_ID}/portfolio-holding/stock
+```
 
-## Key Files
+**Parameters:**
+- `start`: 1-based start index
+- `count`: Number of records (max 500)
+- `sortColumn`: `percentWeight`
+- `sortOrder`: `desc`
 
-| File | Purpose |
-|------|---------|
-| `src/data/holdings_cache.py` | 3-tier cache + `ManualUploadRequired` exception |
-| `src/data/holdings_normalizer.py` | Normalize messy CSV/XLSX uploads |
-| `src/data/community_sync.py` | GitHub pull/push for community data |
-| `src/adapters/amundi.py` | Imports exception from holdings_cache |
-| `scripts/run_pipeline.py` | Integrated with cache (Option B) |
+**Response fields:**
+- `size`: Total holdings count
+- `fund.entity[]`: Holdings array with ticker, isin, weight, etc.
 
-## Known Limitations
+## ISIN Mappings Added
 
-1. **Vanguard:** Only extracts top 10 holdings (~25% weight)
-2. **Amundi Playwright:** Download button selectors broken, manual fallback works
-3. **Normalizer:** Substring matching issue in `_map_columns()` (documented, not critical)
+| European ISIN | US Ticker | US Fund ID | Index |
+|---------------|-----------|------------|-------|
+| IE00BK5BQT80 (VWCE) | VT | 3141 | FTSE All-World |
+| IE00B3RBWM25 (VWRL) | VT | 3141 | FTSE All-World |
+| IE00BKX55T58 (VEVE) | VXUS | 3369 | FTSE Developed ex-US |
 
-## Next Steps
+## Test Results (VWCE / IE00BK5BQT80)
 
-1. **Phase 3:** Dashboard UX - sync button, upload widget, cache stats display
-2. **Phase 4:** Docker image to GHCR, friend documentation
+- **Holdings fetched:** 9,936 (via 20 API calls)
+- **Unique holdings:** 2,059 (after filtering)
+- **Total weight:** 91.78% (stocks only - bonds/cash in other endpoints)
+- **ISINs present:** 2,058/2,059
+- **Tickers present:** 2,001/2,059
+
+## Strategy Order
+
+1. Manual file (CSV/XLSX in `data/inputs/manual_holdings/`)
+2. **US Vanguard API** (complete holdings with ISINs) ← NEW
+3. Playwright (German site fallback)
+4. BeautifulSoup (top 10 only, last resort)
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/adapters/vanguard.py` | Added US API integration with pagination |
+
+## Next Steps (Future)
+
+1. Add more ISIN mappings for other Vanguard ETFs (VUAA, VUSA, etc.)
+2. Consider fetching bonds endpoint for fixed income ETFs
+3. Beta tester feedback integration

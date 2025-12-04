@@ -4,6 +4,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from src.dashboard.utils import load_asset_universe
+from src.data.holdings_cache import get_holdings_cache, MANUAL_UPLOAD_DIR
+from src.data.community_sync import get_community_sync
+from src.data.holdings_normalizer import normalize_holdings
 
 # Constants
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -205,3 +208,192 @@ def render():
     with col3:
         if st.button("🔄 Reset Filters"):
             st.rerun()
+
+    # =========================================================================
+    # Holdings Cache Management Section
+    # =========================================================================
+    st.divider()
+    st.subheader("📦 Holdings Cache Management")
+    st.caption(
+        "Manage ETF holdings data. The cache provides offline access to ETF compositions "
+        "for look-through analysis."
+    )
+
+    # Initialize cache and sync
+    holdings_cache = get_holdings_cache()
+    community_sync = get_community_sync()
+
+    # Cache Statistics
+    cache_stats = holdings_cache.get_cache_stats()
+    sync_stats = community_sync.get_sync_stats()
+
+    stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+    stat_col1.metric(
+        "Local Cache",
+        cache_stats["local_count"],
+        help="ETFs cached locally for fast offline access",
+    )
+    stat_col2.metric(
+        "Community Data",
+        cache_stats["community_count"],
+        help="ETFs available from community contributions",
+    )
+    stat_col3.metric(
+        "Fresh / Stale",
+        f"{cache_stats['local_fresh']} / {cache_stats['local_stale']}",
+        help="Fresh entries are less than 7 days old",
+    )
+    stat_col4.metric(
+        "Last Sync",
+        _format_last_sync(sync_stats.get("last_sync")),
+        help="When community data was last synchronized",
+    )
+
+    # Action buttons row
+    st.write("")  # Spacer
+    action_col1, action_col2, action_col3 = st.columns(3)
+
+    with action_col1:
+        if st.button("🔄 Sync Community Data", type="secondary"):
+            with st.spinner("Syncing with GitHub..."):
+                try:
+                    results = community_sync.pull_community_data()
+                    if results["downloaded"]:
+                        st.success(
+                            f"Downloaded {len(results['downloaded'])} ETFs: "
+                            f"{', '.join(results['downloaded'][:5])}"
+                            f"{'...' if len(results['downloaded']) > 5 else ''}"
+                        )
+                    if results["skipped"]:
+                        st.info(
+                            f"Skipped {len(results['skipped'])} (already up-to-date)"
+                        )
+                    if results["failed"]:
+                        st.warning(f"Failed: {', '.join(results['failed'])}")
+                    if not results["downloaded"] and not results["failed"]:
+                        st.info("Already up-to-date!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Sync failed: {e}")
+
+    with action_col2:
+        if st.button("🗑️ Clear Local Cache", type="secondary"):
+            holdings_cache.clear_local_cache()
+            st.success("Local cache cleared!")
+            st.rerun()
+
+    with action_col3:
+        available_isins = holdings_cache.list_available_isins()
+        st.caption(f"{len(available_isins)} ETFs available for look-through")
+
+    # Manual Upload Section
+    st.divider()
+    st.subheader("📤 Manual Holdings Upload")
+    st.caption(
+        "Upload ETF holdings files manually. Useful for ETFs that require login "
+        "or aren't available via automated fetching."
+    )
+
+    upload_col1, upload_col2 = st.columns([2, 1])
+
+    with upload_col1:
+        uploaded_file = st.file_uploader(
+            "Upload Holdings File",
+            type=["csv", "xlsx", "xls"],
+            help="Upload a CSV or Excel file with ETF holdings. Must contain ISIN and weight columns.",
+        )
+
+    with upload_col2:
+        manual_isin = st.text_input(
+            "ETF ISIN",
+            placeholder="e.g., IE00B4L5Y983",
+            help="The ISIN of the ETF these holdings belong to",
+        )
+
+    if uploaded_file and manual_isin:
+        # Preview and process
+        st.write("**Preview:**")
+        try:
+            # Read the file
+            if uploaded_file.name.endswith(".csv"):
+                raw_df = pd.read_csv(uploaded_file)
+            else:
+                raw_df = pd.read_excel(uploaded_file)
+
+            # Show raw preview
+            st.dataframe(raw_df.head(10), use_container_width=True)
+            st.caption(f"Rows: {len(raw_df)}, Columns: {list(raw_df.columns)}")
+
+            # Try to normalize
+            normalized_df = normalize_holdings(raw_df)
+            issues = []  # normalize_holdings logs issues internally
+
+            if issues:
+                for issue in issues:
+                    st.warning(f"⚠️ {issue}")
+
+            if not normalized_df.empty:
+                st.success(
+                    f"Normalized to {len(normalized_df)} holdings "
+                    f"(total weight: {normalized_df['weight_percentage'].sum():.1f}%)"
+                )
+
+                if st.button("💾 Save to Cache", type="primary"):
+                    # Save the normalized file
+                    holdings_cache._save_to_local_cache(
+                        isin=manual_isin.strip().upper(),
+                        holdings=normalized_df,
+                        source="manual_upload",
+                    )
+                    st.success(f"Saved {manual_isin} to cache!")
+                    st.rerun()
+            else:
+                st.error(
+                    "Could not normalize file. Please ensure it has ISIN/Name and Weight columns."
+                )
+
+        except Exception as e:
+            st.error(f"Failed to read file: {e}")
+
+    # Available ETFs browser
+    with st.expander("Browse Available ETFs", expanded=False):
+        available_isins = holdings_cache.list_available_isins()
+        if available_isins:
+            # Create a simple table
+            etf_data = []
+            for isin in available_isins[:50]:  # Limit to 50 for performance
+                meta = holdings_cache._local_metadata.get(
+                    isin, holdings_cache._community_metadata.get(isin, {})
+                )
+                etf_data.append(
+                    {
+                        "ISIN": isin,
+                        "Name": meta.get("name", isin),
+                        "Holdings": meta.get("holdings_count", "?"),
+                        "Source": meta.get("source", "community"),
+                    }
+                )
+            st.dataframe(
+                pd.DataFrame(etf_data), use_container_width=True, hide_index=True
+            )
+            if len(available_isins) > 50:
+                st.caption(f"Showing 50 of {len(available_isins)} ETFs")
+        else:
+            st.info("No ETFs in cache. Sync community data or upload manually.")
+
+
+def _format_last_sync(last_sync) -> str:
+    """Format last sync timestamp for display."""
+    if not last_sync:
+        return "Never"
+    try:
+        sync_time = datetime.fromisoformat(last_sync)
+        age = datetime.now() - sync_time
+        if age.days > 0:
+            return f"{age.days}d ago"
+        elif age.seconds > 3600:
+            return f"{age.seconds // 3600}h ago"
+        else:
+            return f"{age.seconds // 60}m ago"
+    except Exception:
+        return "Unknown"

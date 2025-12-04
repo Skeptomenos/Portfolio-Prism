@@ -58,6 +58,9 @@ outputs/*
 
 # Backup files
 config/**/*.backup*
+config/*.bak.*
+data/working/*.backup.*
+data/working/snapshots/
 
 # Legacy / Transient
 tr_pdf_exports/

@@ -2,16 +2,20 @@
 """
 Vanguard ETF Adapter
 
-Fetches holdings data from Vanguard's German investor website.
-Uses Playwright for scraping as Vanguard uses client-side rendering.
+Fetches holdings data from Vanguard ETFs using multiple strategies:
+1. Manual file (CSV/XLSX placed by user)
+2. US Vanguard API (complete holdings via investor.vanguard.com)
+3. German site scraping via Playwright (fallback)
+4. German site via BeautifulSoup (last resort, top 10 only)
 
-Supports manual file fallback similar to other adapters.
+The US API strategy is preferred as it returns ALL holdings with ISINs.
 """
 
 import os
 import sys
 import json
 import re
+import requests
 import pandas as pd
 from typing import Optional, List, Dict, Any
 
@@ -21,10 +25,43 @@ from src.config import MANUAL_INPUTS_DIR, RAW_DOWNLOADS_DIR
 
 logger = get_logger(__name__)
 
-# Known Vanguard ETF product IDs
+# Mapping of European Vanguard ISINs to US equivalent funds
+# European ETFs often track the same index as US-listed ETFs
+# The US API provides complete holdings with ISINs
+VANGUARD_US_EQUIVALENTS = {
+    # FTSE All-World Index funds
+    "IE00BK5BQT80": {  # VWCE - FTSE All-World UCITS ETF (Accumulating)
+        "fund_id": "3141",
+        "ticker": "VT",
+        "name": "Vanguard Total World Stock ETF",
+        "note": "Same index: FTSE Global All Cap",
+    },
+    "IE00B3RBWM25": {  # VWRL - FTSE All-World UCITS ETF (Distributing)
+        "fund_id": "3141",
+        "ticker": "VT",
+        "name": "Vanguard Total World Stock ETF",
+        "note": "Same index: FTSE Global All Cap",
+    },
+    # FTSE Developed World ex-US
+    "IE00BKX55T58": {  # VEVE - FTSE Developed World UCITS ETF
+        "fund_id": "3369",
+        "ticker": "VXUS",
+        "name": "Vanguard Total International Stock ETF",
+        "note": "Similar: FTSE Developed ex-US",
+    },
+}
+
+# Known Vanguard ETF product IDs for German site (fallback)
 # Format: ISIN -> (product_id, product_slug)
 VANGUARD_PRODUCTS = {
     "IE00BK5BQT80": ("9679", "ftse-all-world-ucits-etf-usd-accumulating"),
+}
+
+# HTTP headers for API requests
+VANGUARD_API_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "Accept": "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 
@@ -32,10 +69,14 @@ class VanguardAdapter:
     """
     Adapter for fetching ETF holdings data from Vanguard.
 
-    Strategy:
-    1. Try manual file first (CSV/XLSX in manual_inputs directory)
-    2. Try BeautifulSoup for quick scraping (gets top 10 holdings)
-    3. Fallback to Playwright for full holdings with network interception
+    Strategy (in order of preference):
+    1. Manual file (CSV/XLSX in manual_inputs directory)
+    2. US Vanguard API (complete holdings via investor.vanguard.com)
+    3. German site via Playwright (fallback)
+    4. German site via BeautifulSoup (last resort, top 10 only)
+
+    The US API is preferred as it returns ALL holdings with ISINs included.
+    European ISINs are mapped to their US equivalent funds.
     """
 
     def __init__(self, isin: Optional[str] = None):
@@ -46,10 +87,15 @@ class VanguardAdapter:
             isin: Optional ISIN for validation. If provided, checks if supported.
         """
         self.isin = isin
-        if isin and isin not in VANGUARD_PRODUCTS:
+        # Check if we have a mapping for this ISIN
+        if (
+            isin
+            and isin not in VANGUARD_US_EQUIVALENTS
+            and isin not in VANGUARD_PRODUCTS
+        ):
             logger.warning(
-                f"ISIN {isin} not in known Vanguard products. "
-                "Will attempt auto-discovery."
+                f"ISIN {isin} not in known Vanguard mappings. "
+                "Will attempt fallback strategies."
             )
 
     @cache_adapter_data(ttl_hours=24)
@@ -71,19 +117,184 @@ class VanguardAdapter:
         if df is not None:
             return df
 
-        # 2. Try Playwright with network interception for full holdings
-        logger.info("  - No manual file found. Trying Playwright scraping...")
+        # 2. Try US API (preferred - complete holdings with ISINs)
+        logger.info("  - No manual file found. Trying US Vanguard API...")
+        df = self._fetch_via_us_api(isin)
+        if df is not None and not df.empty:
+            logger.info(f"  - Success! Got {len(df)} holdings from US API")
+            return df
+
+        # 3. Fallback to Playwright (German site)
+        logger.info("  - US API not available. Trying Playwright scraping...")
         df = self._fetch_via_playwright(isin)
         if df is not None and not df.empty:
             return df
 
-        # 3. Fallback to BeautifulSoup (lightweight, gets top holdings only)
+        # 4. Last resort - BeautifulSoup (German site, top 10 only)
         logger.info("  - Playwright failed. Falling back to BeautifulSoup...")
         df = self._fetch_via_beautifulsoup(isin)
         if df is not None and not df.empty:
             return df
 
         return pd.DataFrame()
+
+    def _fetch_via_us_api(self, isin: str) -> Optional[pd.DataFrame]:
+        """
+        Fetches complete holdings from Vanguard US API.
+
+        This method maps European ISINs to their US equivalent funds
+        and fetches all holdings via the investor.vanguard.com API.
+
+        Benefits:
+        - No browser/Playwright needed - simple HTTP requests
+        - Returns ALL holdings (not just top 10)
+        - Includes ISINs, tickers, weights, market values
+
+        Args:
+            isin: The ISIN of the ETF (European or US).
+
+        Returns:
+            DataFrame with all holdings, or None if not available.
+        """
+        # Look up US equivalent fund
+        us_fund = VANGUARD_US_EQUIVALENTS.get(isin)
+        if not us_fund:
+            logger.info(f"    No US equivalent mapping for {isin}")
+            return None
+
+        fund_id = us_fund["fund_id"]
+        us_ticker = us_fund["ticker"]
+        logger.info(f"    Mapped {isin} -> US fund {us_ticker} (ID: {fund_id})")
+
+        # Fetch holdings with pagination
+        # Note: The API uses 1-based 'start' and 'count' params, not 'offset' and 'limit'
+        all_holdings: List[Dict[str, Any]] = []
+        start = 1  # 1-based indexing
+        count = 500  # Max per request
+        total_size = None  # Will be set from API response
+
+        base_url = f"https://investor.vanguard.com/investment-products/etfs/profile/api/{fund_id}/portfolio-holding/stock"
+
+        try:
+            while True:
+                params = {
+                    "start": start,
+                    "count": count,
+                    "sortColumn": "percentWeight",
+                    "sortOrder": "desc",
+                }
+
+                logger.info(f"    Fetching holdings (start={start}, count={count})...")
+                response = requests.get(
+                    base_url,
+                    params=params,
+                    headers=VANGUARD_API_HEADERS,
+                    timeout=30,
+                )
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Get total size from first response
+                if total_size is None:
+                    total_size = data.get("size", 0)
+                    logger.info(f"    API reports {total_size} total holdings")
+
+                holdings = data.get("fund", {}).get("entity", [])
+
+                if not holdings:
+                    break
+
+                all_holdings.extend(holdings)
+                logger.info(
+                    f"    Got {len(holdings)} holdings (total: {len(all_holdings)}/{total_size})"
+                )
+
+                # Check if we've fetched all holdings
+                if len(all_holdings) >= total_size:
+                    break
+
+                if len(holdings) < count:
+                    break
+
+                start += count
+
+            if not all_holdings:
+                logger.warning("    US API returned no holdings")
+                return None
+
+            # Convert to DataFrame
+            df = self._normalize_us_api_response(all_holdings)
+            logger.info(f"    Total holdings from US API: {len(df)}")
+            return df
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"    US API request failed: {e}")
+            return None
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"    Failed to parse US API response: {e}")
+            return None
+
+    def _normalize_us_api_response(
+        self, holdings: List[Dict[str, Any]]
+    ) -> pd.DataFrame:
+        """
+        Normalizes the US Vanguard API response to our standard DataFrame format.
+
+        Args:
+            holdings: List of holding dicts from the API.
+
+        Returns:
+            Normalized DataFrame with standard columns.
+        """
+        if not holdings:
+            return pd.DataFrame()
+
+        # Extract relevant fields
+        rows = []
+        for h in holdings:
+            # The API returns weight as string percentage (e.g., "4.54")
+            weight_str = h.get("percentWeight", "0")
+            try:
+                weight = float(weight_str)
+            except (ValueError, TypeError):
+                weight = 0.0
+
+            rows.append(
+                {
+                    "ticker": h.get("ticker"),
+                    "isin": h.get("isin"),
+                    "name": h.get("longName") or h.get("shortName"),
+                    "weight_percentage": weight,  # Already in percentage format
+                    "sector": h.get("secMainType"),
+                    "location": None,  # Not provided by US API
+                    "market_value": h.get("marketValue"),
+                    "shares": h.get("sharesHeld"),
+                    "cusip": h.get("cusip"),
+                    "sedol": h.get("sedol"),
+                }
+            )
+
+        df = pd.DataFrame(rows)
+
+        # Filter out invalid rows
+        df = df.dropna(subset=["name"])
+        df = df[df["weight_percentage"] > 0]
+
+        # Ensure standard column order
+        standard_cols = [
+            "ticker",
+            "isin",
+            "name",
+            "weight_percentage",
+            "sector",
+            "location",
+        ]
+        for col in standard_cols:
+            if col not in df.columns:
+                df[col] = None
+
+        return pd.DataFrame(df[standard_cols])
 
     def _fetch_via_playwright(self, isin: str) -> Optional[pd.DataFrame]:
         """
