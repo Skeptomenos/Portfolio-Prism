@@ -285,6 +285,24 @@ def run_pipeline():
     final_report_df = pd.read_csv("outputs/true_exposure_report.csv")
     validate_final_report(all_positions, final_report_df)
 
+    # --- Optional: Ground Truth Validation (Development Mode) ---
+    if os.environ.get("VALIDATE_PORTFOLIO", "false").lower() == "true":
+        logger.info("--- Running Ground Truth Validation ---")
+        try:
+            from scripts.validate_portfolio import validate_portfolio
+
+            validation_result = validate_portfolio(
+                reference_date="2025-11-24",
+                tolerance=0.02,
+            )
+            if validation_result.discrepancy_pct > 0.10:
+                logger.warning(
+                    f"Portfolio validation: High discrepancy detected "
+                    f"({validation_result.discrepancy_pct:.1%})"
+                )
+        except Exception as e:
+            logger.warning(f"Ground truth validation skipped: {e}")
+
     # --- Final Step: Data Quality Report ---
     generate_quality_report(failed_etfs, "outputs/data_quality_report.txt")
 

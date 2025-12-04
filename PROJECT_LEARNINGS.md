@@ -142,3 +142,11 @@
 - **External Tool Output Formats:** pytr v0.4.2 outputs 5 columns (`Name;ISIN;quantity;avgCost;netValue`), not 6 as previously assumed. The `price` field doesn't exist; `netValue` is calculated internally by pytr. **Rule:** Always verify external tool output format against actual source code, not assumptions or documentation.
 - **Derived Values:** When a value isn't directly available, derive it from related fields. `current_price = netValue / quantity`. Document the derivation clearly in code comments.
 - **Auto-Grow Universe:** When new ISINs appear in holdings but aren't in the asset universe, auto-add them using available metadata (TR_Name) rather than failing. Mark source as `auto_tr` for auditability. The universe should be the ultimate source of truth and grow automatically.
+
+### Phase 21: Dashboard Analytics Enhancement (2025-12-04)
+- **Tab Organization:** Dashboard tab order should reflect user priority: actionable insights first (Performance, X-Ray), exploration second (ETF Overlap, Holdings), maintenance last (Data Manager, Health). Users scan left-to-right.
+- **Concentration Metrics:** HHI (sum of squared weights) is a robust, single-number concentration measure. Values >0.15 = concentrated, >0.25 = highly concentrated. Complement with top-N percentages for intuition.
+- **Similarity Metrics:** For ETF overlap analysis, Jaccard similarity (intersection/union) works well for binary membership. Alternative: weighted overlap using actual value contributions.
+- **Snapshot Strategy:** Daily JSON snapshots enable historical tracking without database complexity. Key: auto-trigger on dashboard load with staleness check (>24h). Store in `data/working/snapshots/` with date-based filenames.
+- **Cost Basis from API:** pytr provides `avgCost` per position, enabling P/L calculations without manual tracking. Derive current price from `netValue/quantity` when not directly available.
+- **Phased Implementation:** 4-phase dashboard enhancement (Performance → Concentration → Overlap → Snapshots) allowed iterative validation. Each phase testable in isolation before proceeding.

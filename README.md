@@ -104,13 +104,16 @@ Open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ## 📊 Dashboard Features
 
-The interactive Streamlit dashboard shows:
+The interactive Streamlit dashboard has 6 tabs:
 
-- **Portfolio Overview** - Total value, asset allocation pie charts
-- **True Exposure** - Your real holdings after ETF decomposition
-- **Top Holdings** - Your biggest positions (including hidden ETF exposure)
-- **Stock Lookup** - Search any stock to see your total exposure
-- **Sector & Geography** - Where your money is actually invested
+| Tab | Features |
+|-----|----------|
+| **Performance** | P/L analytics, unrealized gains/losses, winners/losers visualization |
+| **Portfolio X-Ray** | Total value, asset allocation, concentration risk (HHI), single-stock alerts |
+| **ETF Overlap** | Overlap matrix heatmap, securities in multiple ETFs, hidden concentration alerts |
+| **Holdings Analysis** | ETF drill-down explorer, stock lookup with consolidated exposure |
+| **Data Manager** | Edit asset universe, automatic backups, duplicate validation |
+| **Pipeline Health** | ETFs processed, ISIN resolution stats, actionable error list |
 
 ---
 

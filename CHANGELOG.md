@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.1] - 2025-12-04
+
+### Added
+- **Performance Tab**: New dashboard tab with P/L analytics, unrealized gains/losses, and winners/losers visualization using AvgCost data from Trade Republic via pytr.
+- **ETF Overlap Tab**: New dashboard tab with overlap matrix heatmap (Jaccard similarity), securities appearing in multiple ETFs, and hidden concentration alerts.
+- **Concentration Risk Metrics**: Enhanced Portfolio X-Ray tab with HHI (Herfindahl-Hirschman Index), top 5/10 concentration percentages, and single-stock risk alerts (>15% warning).
+- **Automated Snapshots**: Daily JSON snapshots in `data/working/snapshots/` for historical value tracking. Auto-creates snapshot on dashboard load if >24h old.
+
+### Changed
+- **Dashboard Structure**: Reorganized to 6 tabs (Performance, Portfolio X-Ray, ETF Overlap, Holdings Analysis, Data Manager, Pipeline Health).
+- **README.md**: Updated Dashboard Features section to reflect new 6-tab structure.
+
+### Archived
+- Moved 15 legacy plan files from `docs/plans/` to `docs/archive/plans/`.
+
+---
+
 ## [0.2.0] - 2025-12-03
 
 ### Added

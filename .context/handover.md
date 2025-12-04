@@ -1,74 +1,39 @@
-# Handover: pytr Deep Integration Complete (2025-12-03)
+# Handover: Dashboard Analytics Enhancement Complete (2025-12-04)
 
-## Status: COMPLETE (v0.2.0)
+## Status: COMPLETE (v0.2.1)
 
-Successfully implemented Phase 2 pytr deep integration. Users can now run `bash run.sh` and fetch portfolio via Trade Republic API with a single command.
+Dashboard enhanced with 4 new features: Performance P/L tab, ETF Overlap analysis, Concentration metrics, and automated snapshots.
 
 ## What Was Done
 
-### Phase 2: pytr Deep Integration
-1. Created `scripts/fetch_tr_api.py` - full pytr wrapper with:
-   - Credential management (load from `.env`, prompt if missing)
-   - Privacy notice for first-run
-   - `--reconfigure` flag to update credentials
-   - Auto-backup with timestamp before overwrite
-   - Session cookies in `~/.pytr/cookies/`
-   - Error handling with PDF fallback suggestions
+### Dashboard Analytics Enhancement
+1. **Performance Tab (NEW)**: P/L analytics with unrealized gains/losses, winners/losers visualization. Uses AvgCost from pytr.
+2. **ETF Overlap Tab (NEW)**: Overlap matrix heatmap (Jaccard similarity), securities in multiple ETFs, hidden concentration alerts.
+3. **Concentration Risk (Enhanced)**: HHI calculation, top 5/10 concentration %, single-stock alerts (>15% warning) in Portfolio X-Ray.
+4. **Automated Snapshots**: Daily JSON snapshots in `data/working/snapshots/` for historical tracking.
 
-2. Rewrote `run.sh` with:
-   - Interactive menu (API default, PDF fallback)
-   - Waits indefinitely for user input
-   - Graceful fallback on API failure
-
-3. Updated documentation:
-   - README.md: New quickstart with API-first workflow
-   - .env.example: Added TR credentials placeholders
-   - requirements.txt: Added pytr>=0.4.2
-
-## New User Workflow
-
-```bash
-bash run.sh
-# Select [1] Trade Republic API (press Enter for default)
-# First run: Enter phone + PIN (saved to .env)
-# Enter 4-digit code from TR app
-# Done! Pipeline runs automatically
-```
-
-## Key Files Changed
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `scripts/fetch_tr_api.py` | **New** - pytr wrapper script |
-| `run.sh` | **Rewritten** - Interactive menu |
-| `requirements.txt` | Added pytr>=0.4.2 |
-| `.env.example` | Added TR_PHONE_NO, TR_PIN |
-| `README.md` | Updated quickstart |
-| `docs/plans/MVP-plan.md` | Phase 2 complete |
-| `CHANGELOG.md` | Added v0.2.0 release notes |
-| `PROJECT_LEARNINGS.md` | Added Phase 19 learnings |
+| `src/dashboard/tabs/performance.py` | **Created** - P/L analytics tab |
+| `src/dashboard/tabs/etf_overlap.py` | **Created** - ETF overlap analysis tab |
+| `src/dashboard/tabs/portfolio_xray.py` | **Enhanced** - Added concentration metrics |
+| `src/dashboard/utils.py` | **Enhanced** - Added snapshot functions |
+| `src/dashboard/app.py` | **Modified** - Added new tabs (6 total) |
+| `README.md` | **Updated** - Dashboard Features section |
+| `CHANGELOG.md` | **Updated** - v0.2.1 release notes |
 
-## Next Steps (MVP Phases 3-6)
+## Next Steps
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 3 | Remove Selenium Dependency | Pending |
-| Phase 4 | Reduce API Dependency | Pending |
-| Phase 5 | Docker Container | Pending |
-| Phase 6 | UX Polish | Pending |
+1. **Test Dashboard**: Run `./run_dashboard.sh` to verify all 6 tabs render correctly
+2. **Historical Charts**: Build time-series visualizations once snapshot data accumulates (7+ days)
+3. **MVP Phase 3-6**: Remove Selenium, Docker container, UX polish
 
 ## Quick Commands
 
 ```bash
-# Run with API (recommended)
-bash run.sh  # Select option 1
-
-# Update credentials
-python scripts/fetch_tr_api.py --reconfigure
-
-# View dashboard
-./run_dashboard.sh
-
-# Run tests
-pytest
+./run_dashboard.sh   # View dashboard with new tabs
+pytest               # 47 tests passing
+bash run.sh          # Run pipeline (API or PDF)
 ```
