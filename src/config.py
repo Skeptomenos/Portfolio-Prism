@@ -1,7 +1,13 @@
+import os
 from pathlib import Path
 
 # Base project directory (2 levels up from src/config.py)
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+
+# Proxy configuration (for Docker distribution)
+# When set, API calls route through the proxy instead of direct calls
+PROXY_URL = os.getenv("PROXY_URL")  # e.g., https://portfolio-api.helmus.me
+PROXY_API_KEY = os.getenv("PROXY_API_KEY")
 
 # Data Directories
 DATA_DIR = PROJECT_ROOT / "data"

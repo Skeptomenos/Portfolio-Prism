@@ -20,10 +20,10 @@ RUN pip install -e .
 ENV DOCKER_MODE=true
 ENV PYTHONUNBUFFERED=1
 
-# Sensitive env vars should be passed at runtime via:
-# - docker run -e FINNHUB_API_KEY=xxx
-# - docker-compose.yml environment section
-# - .env file
+# Proxy configuration for distributed Docker images
+# Routes API calls through your proxy server (no secrets in image)
+ENV PROXY_URL=https://portfolio-api.helmus.me
+ENV PROXY_API_KEY=sk-froth-cyclic-nutlike
 
 # Expose Streamlit
 EXPOSE 8501

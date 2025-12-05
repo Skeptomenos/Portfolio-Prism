@@ -24,6 +24,7 @@ from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 
 from src.utils.logging_config import get_logger
+from src.config import PROXY_URL, PROXY_API_KEY
 
 logger = get_logger(__name__)
 
@@ -211,19 +212,29 @@ class Telemetry:
         body: str,
         labels: list,
     ) -> dict:
-        """Create a GitHub issue."""
-        url = f"{self._api_base}/issues"
-        req = Request(url, method="POST")
-        req.add_header("User-Agent", "Portfolio-Prism")
-        req.add_header("Accept", "application/vnd.github.v3+json")
-        req.add_header("Authorization", f"Bearer {self.github_token}")
-        req.add_header("Content-Type", "application/json")
-
+        """Create a GitHub issue (via proxy if configured)."""
         data = {
             "title": title,
             "body": body,
             "labels": labels,
         }
+
+        if PROXY_URL and PROXY_API_KEY:
+            # Distributed mode: route through proxy
+            url = f"{PROXY_URL}/api/github/issues"
+            req = Request(url, method="POST")
+            req.add_header("X-API-Key", PROXY_API_KEY)
+            req.add_header("Content-Type", "application/json")
+            req.add_header("User-Agent", "Portfolio-Prism")
+        else:
+            # Local dev mode: direct GitHub API call
+            url = f"{self._api_base}/issues"
+            req = Request(url, method="POST")
+            req.add_header("Authorization", f"Bearer {self.github_token}")
+            req.add_header("Accept", "application/vnd.github.v3+json")
+            req.add_header("Content-Type", "application/json")
+            req.add_header("User-Agent", "Portfolio-Prism")
+
         req.data = json.dumps(data).encode()
 
         with urlopen(req, timeout=30) as response:

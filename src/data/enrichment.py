@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from src.data.caching import load_from_cache, save_to_cache, get_cache_key
 from src.utils.validation import is_valid_isin
-from src.config import ASSET_UNIVERSE_PATH
+from src.config import ASSET_UNIVERSE_PATH, PROXY_URL, PROXY_API_KEY
 import pandas as pd
 
 # Load environment variables from .env file
@@ -286,13 +286,47 @@ def enrich_securities_bulk(
             # but at least we have the ID.
             print("L", end="", flush=True)  # L for Local
 
-        # Primary: Finnhub
-        if FINNHUB_API_KEY:
+        # Primary: Finnhub (via proxy if configured, otherwise direct)
+        if PROXY_URL and PROXY_API_KEY:
+            # Distributed mode: route through proxy
+            try:
+                response = session.get(
+                    f"{PROXY_URL}/api/finnhub/profile",
+                    params={"symbol": identifier},
+                    headers={"X-API-Key": PROXY_API_KEY},
+                )
+                if response.status_code == 200:
+                    profile_data = response.json()
+                    if profile_data:
+                        finnhub_isin = profile_data.get("isin")
+                        result.update(
+                            {
+                                "ticker": profile_data.get("ticker", identifier),
+                                "name": profile_data.get("name", "N/A"),
+                                "sector": profile_data.get(
+                                    "finnhubIndustry", "Unknown"
+                                ),
+                                "geography": profile_data.get("country", "Unknown"),
+                            }
+                        )
+                        if finnhub_isin:
+                            result["isin"] = finnhub_isin
+                            logger.debug(
+                                f"ISIN for {identifier}: {finnhub_isin} [Proxy]"
+                            )
+                        print("P", end="", flush=True)  # P for Proxy
+                    else:
+                        logger.warning(f"Empty profile from proxy for {identifier}")
+                time.sleep(1.1)  # Rate limiting
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Proxy request error for {identifier}: {e}")
+                print("x", end="", flush=True)
+        elif FINNHUB_API_KEY:
+            # Local dev mode: direct Finnhub call
             try:
                 response = session.get(
                     f"{FINNHUB_API_URL}/stock/profile2", params={"symbol": identifier}
                 )
-                # response.raise_for_status() # Don't raise, just fall through to fallback
                 if response.status_code == 200:
                     profile_data = response.json()
                     if profile_data:

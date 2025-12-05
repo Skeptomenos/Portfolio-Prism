@@ -30,7 +30,7 @@ from typing import Dict, List, Literal, Optional, Any
 import pandas as pd
 import requests
 
-from src.config import ASSET_UNIVERSE_PATH
+from src.config import ASSET_UNIVERSE_PATH, PROXY_URL, PROXY_API_KEY
 from src.utils.isin_validator import is_valid_isin, is_placeholder_isin
 from src.utils.logging_config import get_logger
 from src.data.manual_enrichments import load_manual_enrichments
@@ -381,17 +381,31 @@ class ISINResolver:
         return ResolutionResult(isin=None, status="unresolved", detail="api_all_failed")
 
     def _call_finnhub(self, ticker: str) -> Optional[str]:
-        """Call Finnhub API for ISIN."""
-        if not FINNHUB_API_KEY or not ticker:
+        """Call Finnhub API for ISIN (via proxy if configured)."""
+        if not ticker:
+            return None
+
+        # Require either proxy or direct API key
+        if not PROXY_URL and not FINNHUB_API_KEY:
             return None
 
         try:
-            response = requests.get(
-                f"{FINNHUB_API_URL}/stock/profile2",
-                params={"symbol": ticker},
-                headers={"X-Finnhub-Token": FINNHUB_API_KEY},
-                timeout=10,
-            )
+            if PROXY_URL and PROXY_API_KEY:
+                # Distributed mode: route through proxy
+                response = requests.get(
+                    f"{PROXY_URL}/api/finnhub/profile",
+                    params={"symbol": ticker},
+                    headers={"X-API-Key": PROXY_API_KEY},
+                    timeout=10,
+                )
+            else:
+                # Local dev mode: direct Finnhub call
+                response = requests.get(
+                    f"{FINNHUB_API_URL}/stock/profile2",
+                    params={"symbol": ticker},
+                    headers={"X-Finnhub-Token": FINNHUB_API_KEY},
+                    timeout=10,
+                )
 
             if response.status_code == 200:
                 data = response.json()
